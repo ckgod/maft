@@ -71,6 +71,10 @@ body,
   padding: 0;
 }
 
+html {
+  scrollbar-gutter: stable;
+}
+
 body {
   background: var(--paper);
   color: var(--ink);
