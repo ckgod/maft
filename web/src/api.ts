@@ -78,6 +78,22 @@ export async function listTopics(): Promise<TopicsResponse> {
   return fetchJson<TopicsResponse>('/api/topics');
 }
 
+export interface WeakPoint {
+  topicId: string;
+  topicTitle: string;
+  concept: string;
+  count: number;
+  lastSeenAt: number;
+}
+
+export interface WeakPointsResponse {
+  weakPoints: WeakPoint[];
+}
+
+export async function listWeakPoints(limit = 8): Promise<WeakPointsResponse> {
+  return fetchJson<WeakPointsResponse>(`/api/weak-points?limit=${limit}`);
+}
+
 export async function startSession(topicId: string): Promise<SessionStartResponse> {
   return fetchJson<SessionStartResponse>('/api/sessions', {
     method: 'POST',

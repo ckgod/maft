@@ -1,10 +1,12 @@
 import { useEffect, useMemo, useState } from 'react';
 import {
   listTopics,
+  listWeakPoints,
   startSession,
   type Category,
   type SessionStartResponse,
   type Topic,
+  type WeakPoint,
 } from './api';
 import { SessionView } from './SessionView';
 import './App.css';
@@ -52,6 +54,7 @@ export default function App() {
   const [activeCat, setActiveCat] = useState<string | null>(null);
   const [mode, setMode] = useState<AppMode>({ kind: 'list' });
   const [startError, setStartError] = useState<string | null>(null);
+  const [weakPoints, setWeakPoints] = useState<WeakPoint[]>([]);
 
   function loadTopics() {
     listTopics()
@@ -62,8 +65,17 @@ export default function App() {
       .catch((e) => setTopicsError(e instanceof Error ? e.message : String(e)));
   }
 
+  function loadWeakPoints() {
+    listWeakPoints(8)
+      .then((res) => setWeakPoints(res.weakPoints))
+      .catch(() => {
+        // weak points are best-effort, ignore failures
+      });
+  }
+
   useEffect(() => {
     loadTopics();
+    loadWeakPoints();
   }, []);
 
   const sideCategories = useMemo(
@@ -124,6 +136,7 @@ export default function App() {
           onExit={() => {
             setMode({ kind: 'list' });
             loadTopics();
+            loadWeakPoints();
           }}
         />
       </div>
@@ -165,6 +178,24 @@ export default function App() {
             ))}
           </ul>
         </nav>
+
+        {weakPoints.length > 0 && (
+          <section className="sidebar-weakpoints">
+            <span className="eyebrow nav-section-label">// weak points</span>
+            <ul className="weak-list">
+              {weakPoints.map((w) => (
+                <li
+                  key={`${w.topicId}::${w.concept}`}
+                  className="weak-item"
+                  title={`${w.topicTitle} · ${w.count}회 누락`}
+                >
+                  <span className="weak-count">×{w.count}</span>
+                  <span className="weak-concept">{w.concept}</span>
+                </li>
+              ))}
+            </ul>
+          </section>
+        )}
       </aside>
 
       <main className="main-area">

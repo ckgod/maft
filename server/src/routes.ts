@@ -9,7 +9,7 @@ import {
   listSessions,
   updateSessionMeta,
 } from './sessions.js';
-import { getTopicStatsMap } from './stats.js';
+import { getTopicStatsMap, getWeakPoints, recordMissedConcepts } from './stats.js';
 
 export function createRouter(index: TopicIndex): Router {
   const router = Router();
@@ -119,6 +119,9 @@ export function createRouter(index: TopicIndex): Router {
         lastRubric: rubric ?? undefined,
         mastered: masteredNow,
       });
+      if (rubric && rubric.missedConcepts.length > 0) {
+        recordMissedConcepts(session.topicId, rubric.missedConcepts, ts + 1);
+      }
 
       res.json({
         sessionId: session.id,
@@ -151,9 +154,31 @@ export function createRouter(index: TopicIndex): Router {
     res.json({ sessions: listSessions() });
   };
 
+  const listWeakPoints: RequestHandler = (req, res) => {
+    const limitRaw = req.query.limit;
+    let limit = 10;
+    if (typeof limitRaw === 'string') {
+      const parsed = Number.parseInt(limitRaw, 10);
+      if (Number.isFinite(parsed) && parsed > 0) limit = Math.min(parsed, 50);
+    }
+    const rows = getWeakPoints(limit);
+    const items = rows.map((r) => {
+      const topic = index.byId.get(r.topicId);
+      return {
+        topicId: r.topicId,
+        topicTitle: topic?.title ?? r.topicId,
+        concept: r.concept,
+        count: r.count,
+        lastSeenAt: r.lastSeenAt,
+      };
+    });
+    res.json({ weakPoints: items });
+  };
+
   router.get('/topics', getTopics);
   router.post('/sessions', startSession);
   router.get('/sessions', listAllSessions);
+  router.get('/weak-points', listWeakPoints);
   router.get('/sessions/:id', getSessionDetail);
   router.post('/sessions/:id/messages', postMessage);
 
