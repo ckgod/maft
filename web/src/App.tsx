@@ -62,17 +62,19 @@ export default function App() {
     <div className="app">
       <header className="masthead">
         <div className="masthead-row">
-          <span className="eyebrow">Vol. 01 / Phase 1</span>
+          <span className="eyebrow">Vol. 01 · Phase 1</span>
           <span className="eyebrow">Feynman Coach</span>
         </div>
-        <h1 className="masthead-title">
-          Manifest <em>Android</em>
-          <span className="masthead-and">&amp;</span>
-          Feynman Trainer
-        </h1>
-        <p className="masthead-lede">
-          토픽을 자기 말로 풀어내며, 코치의 소크라테스식 역질문을 통해 이해의 격차를 메워가는 학습 도구입니다.
-        </p>
+        <div className="masthead-body">
+          <h1 className="masthead-title">
+            M<em>A</em>FT
+          </h1>
+          <p className="masthead-lede">
+            <span className="masthead-fullname">Manifest Android Feynman Trainer</span>
+            <span className="masthead-sep">·</span>
+            토픽을 자기 말로 풀어내며 코치의 소크라테스식 역질문으로 이해의 격차를 메우는 학습 도구.
+          </p>
+        </div>
       </header>
 
       <main className="main">
