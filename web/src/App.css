@@ -336,9 +336,110 @@
   color: var(--blueprint);
 }
 
+/* Loading / starting state — 클릭한 행만 강조하고 나머지는 비활성 */
+
+.index-list:has(.index-row.is-starting) .index-row:not(.is-starting) {
+  opacity: 0.32;
+  pointer-events: none;
+}
+
 .index-row.is-starting {
-  opacity: 0.55;
   cursor: wait;
+  background: var(--blueprint-soft);
+  border-bottom-style: solid;
+  border-bottom-color: var(--blueprint-line);
+  overflow: hidden;
+}
+
+.index-row.is-starting::before {
+  width: 2px;
+  background: var(--blueprint);
+  animation: scan-pulse 1.2s var(--ease-in-out) infinite;
+}
+
+.index-row.is-starting::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(
+    90deg,
+    transparent 0%,
+    rgba(107, 157, 219, 0.08) 50%,
+    transparent 100%
+  );
+  background-size: 200% 100%;
+  animation: shimmer 1.6s linear infinite;
+  pointer-events: none;
+}
+
+.index-row.is-starting .row-title {
+  color: var(--blueprint);
+}
+
+.index-row.is-starting .row-kind {
+  color: var(--blueprint);
+  border-left-color: var(--blueprint-line);
+}
+
+@keyframes scan-pulse {
+  0%,
+  100% {
+    opacity: 0.45;
+  }
+  50% {
+    opacity: 1;
+  }
+}
+
+@keyframes shimmer {
+  0% {
+    background-position: -100% 0;
+  }
+  100% {
+    background-position: 200% 0;
+  }
+}
+
+/* 3-dot loading indicator (replaces → on starting rows) */
+
+.row-loading {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  width: 16px;
+  height: 100%;
+  justify-content: flex-start;
+}
+
+.row-loading span {
+  width: 4px;
+  height: 4px;
+  border-radius: 50%;
+  background: var(--blueprint);
+  opacity: 0.25;
+  animation: dot-pulse 1.1s var(--ease-in-out) infinite;
+}
+
+.row-loading span:nth-child(1) {
+  animation-delay: 0s;
+}
+.row-loading span:nth-child(2) {
+  animation-delay: 0.16s;
+}
+.row-loading span:nth-child(3) {
+  animation-delay: 0.32s;
+}
+
+@keyframes dot-pulse {
+  0%,
+  100% {
+    opacity: 0.25;
+    transform: scale(0.85);
+  }
+  40% {
+    opacity: 1;
+    transform: scale(1);
+  }
 }
 
 .row-num {

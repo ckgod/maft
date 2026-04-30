@@ -202,11 +202,19 @@ export default function App() {
                       <span className="row-id">{shortId(t.id)}</span>
                       <span className="row-title">{t.title}</span>
                       <span className="row-kind">
-                        {t.kind === 'extra' ? 'extra' : 'question'}
+                        {starting ? 'starting' : t.kind === 'extra' ? 'extra' : 'question'}
                       </span>
-                      <span className="row-arrow" aria-hidden="true">
-                        {starting ? '…' : '→'}
-                      </span>
+                      {starting ? (
+                        <span className="row-loading" aria-label="세션 시작 중">
+                          <span />
+                          <span />
+                          <span />
+                        </span>
+                      ) : (
+                        <span className="row-arrow" aria-hidden="true">
+                          →
+                        </span>
+                      )}
                     </li>
                   );
                 })}
