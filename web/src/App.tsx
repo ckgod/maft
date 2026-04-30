@@ -1,122 +1,74 @@
-import { useState } from 'react'
-import reactLogo from './assets/react.svg'
-import viteLogo from './assets/vite.svg'
-import heroImg from './assets/hero.png'
-import './App.css'
+import { useEffect, useMemo, useState } from 'react';
+import { listTopics, type Topic } from './api';
+import './App.css';
 
-function App() {
-  const [count, setCount] = useState(0)
-
-  return (
-    <>
-      <section id="center">
-        <div className="hero">
-          <img src={heroImg} className="base" width="170" height="179" alt="" />
-          <img src={reactLogo} className="framework" alt="React logo" />
-          <img src={viteLogo} className="vite" alt="Vite logo" />
-        </div>
-        <div>
-          <h1>Get started</h1>
-          <p>
-            Edit <code>src/App.tsx</code> and save to test <code>HMR</code>
-          </p>
-        </div>
-        <button
-          type="button"
-          className="counter"
-          onClick={() => setCount((count) => count + 1)}
-        >
-          Count is {count}
-        </button>
-      </section>
-
-      <div className="ticks"></div>
-
-      <section id="next-steps">
-        <div id="docs">
-          <svg className="icon" role="presentation" aria-hidden="true">
-            <use href="/icons.svg#documentation-icon"></use>
-          </svg>
-          <h2>Documentation</h2>
-          <p>Your questions, answered</p>
-          <ul>
-            <li>
-              <a href="https://vite.dev/" target="_blank">
-                <img className="logo" src={viteLogo} alt="" />
-                Explore Vite
-              </a>
-            </li>
-            <li>
-              <a href="https://react.dev/" target="_blank">
-                <img className="button-icon" src={reactLogo} alt="" />
-                Learn more
-              </a>
-            </li>
-          </ul>
-        </div>
-        <div id="social">
-          <svg className="icon" role="presentation" aria-hidden="true">
-            <use href="/icons.svg#social-icon"></use>
-          </svg>
-          <h2>Connect with us</h2>
-          <p>Join the Vite community</p>
-          <ul>
-            <li>
-              <a href="https://github.com/vitejs/vite" target="_blank">
-                <svg
-                  className="button-icon"
-                  role="presentation"
-                  aria-hidden="true"
-                >
-                  <use href="/icons.svg#github-icon"></use>
-                </svg>
-                GitHub
-              </a>
-            </li>
-            <li>
-              <a href="https://chat.vite.dev/" target="_blank">
-                <svg
-                  className="button-icon"
-                  role="presentation"
-                  aria-hidden="true"
-                >
-                  <use href="/icons.svg#discord-icon"></use>
-                </svg>
-                Discord
-              </a>
-            </li>
-            <li>
-              <a href="https://x.com/vite_js" target="_blank">
-                <svg
-                  className="button-icon"
-                  role="presentation"
-                  aria-hidden="true"
-                >
-                  <use href="/icons.svg#x-icon"></use>
-                </svg>
-                X.com
-              </a>
-            </li>
-            <li>
-              <a href="https://bsky.app/profile/vite.dev" target="_blank">
-                <svg
-                  className="button-icon"
-                  role="presentation"
-                  aria-hidden="true"
-                >
-                  <use href="/icons.svg#bluesky-icon"></use>
-                </svg>
-                Bluesky
-              </a>
-            </li>
-          </ul>
-        </div>
-      </section>
-
-      <div className="ticks"></div>
-      <section id="spacer"></section>
-    </>
-  )
+function shortId(id: string): string {
+  return id.replace(/\.md$/, '');
 }
 
-export default App
+export default function App() {
+  const [topics, setTopics] = useState<Topic[] | null>(null);
+  const [error, setError] = useState<string | null>(null);
+  const [filter, setFilter] = useState('');
+
+  useEffect(() => {
+    listTopics()
+      .then((ts) => setTopics(ts))
+      .catch((e) => setError(e instanceof Error ? e.message : String(e)));
+  }, []);
+
+  const filtered = useMemo(() => {
+    if (!topics) return [];
+    const q = filter.trim().toLowerCase();
+    if (!q) return topics;
+    return topics.filter((t) => t.id.toLowerCase().includes(q) || t.title.toLowerCase().includes(q));
+  }, [topics, filter]);
+
+  return (
+    <div className="app">
+      <header className="header">
+        <h1>Manifest Android Feynman Trainer</h1>
+        <p className="subtitle">파인만 기법으로 안드로이드 CS 토픽을 학습합니다.</p>
+      </header>
+
+      <main className="main">
+        {error ? (
+          <div className="status status-error">
+            <strong>백엔드에 연결할 수 없습니다.</strong>
+            <p>{error}</p>
+            <p className="hint">server 패키지가 실행 중인지 확인하십시오 (포트 3001).</p>
+          </div>
+        ) : !topics ? (
+          <div className="status">토픽 목록을 불러오는 중입니다...</div>
+        ) : (
+          <section className="topic-list-view">
+            <div className="topic-list-head">
+              <h2>학습할 토픽을 선택하세요</h2>
+              <p className="hint">학습 가능한 토픽 {topics.length}개가 인덱싱되어 있습니다.</p>
+              <input
+                className="topic-search"
+                placeholder="토픽 검색 (예: Context, Compose, Coroutine)"
+                value={filter}
+                onChange={(e) => setFilter(e.target.value)}
+              />
+            </div>
+
+            {filtered.length === 0 ? (
+              <p className="status">검색 결과가 없습니다.</p>
+            ) : (
+              <ul className="topic-list">
+                {filtered.map((t) => (
+                  <li key={t.id} className={`topic-item kind-${t.kind}`}>
+                    <span className="topic-id">{shortId(t.id)}</span>
+                    <span className="topic-title">{t.title}</span>
+                    <span className="topic-kind">{t.kind === 'extra' ? 'E' : 'Q'}</span>
+                  </li>
+                ))}
+              </ul>
+            )}
+          </section>
+        )}
+      </main>
+    </div>
+  );
+}
