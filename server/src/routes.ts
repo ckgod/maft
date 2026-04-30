@@ -2,7 +2,13 @@ import { Router, type RequestHandler } from 'express';
 import { callClaude } from './claude.js';
 import { buildSystemPrompt, withFormatReminder, extractRubric } from './prompt.js';
 import type { TopicIndex } from './topics.js';
-import { getSession, saveSession, listSessions, type Session } from './sessions.js';
+import {
+  appendTurn,
+  createSession,
+  getSession,
+  listSessions,
+  updateSessionMeta,
+} from './sessions.js';
 
 export function createRouter(index: TopicIndex): Router {
   const router = Router();
@@ -42,15 +48,12 @@ export function createRouter(index: TopicIndex): Router {
       const systemPrompt = buildSystemPrompt(topic);
       const result = await callClaude({ prompt: '학습 시작', systemPrompt });
 
-      const session: Session = {
+      const session = createSession({
         id: result.sessionId,
         topicId: topic.id,
         createdAt: Date.now(),
-        history: [{ role: 'assistant', text: result.text, rubric: null, ts: Date.now() }],
-        lastRubric: null,
-        mastered: false,
-      };
-      saveSession(session);
+        initialAssistantText: result.text,
+      });
 
       res.json({
         sessionId: session.id,
@@ -90,22 +93,26 @@ export function createRouter(index: TopicIndex): Router {
       });
       const rubric = extractRubric(result.text);
       const ts = Date.now();
-      session.history.push(
-        { role: 'user', text: userMessage, rubric: null, ts },
-        { role: 'assistant', text: result.text, rubric, ts: ts + 1 },
-      );
-      if (rubric) {
-        session.lastRubric = rubric;
-        if (rubric.mastered) session.mastered = true;
-      }
-      saveSession(session);
+      appendTurn(session.id, { role: 'user', text: userMessage, rubric: null, ts });
+      appendTurn(session.id, {
+        role: 'assistant',
+        text: result.text,
+        rubric,
+        ts: ts + 1,
+      });
+      const masteredNow = session.mastered || rubric?.mastered === true;
+      updateSessionMeta(session.id, {
+        updatedAt: ts + 1,
+        lastRubric: rubric ?? undefined,
+        mastered: masteredNow,
+      });
 
       res.json({
         sessionId: session.id,
         topicId: session.topicId,
         message: result.text,
         rubric,
-        mastered: session.mastered,
+        mastered: masteredNow,
       });
     } catch (e) {
       const msg = e instanceof Error ? e.message : String(e);
