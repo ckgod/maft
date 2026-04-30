@@ -294,6 +294,116 @@
   margin: 2px 0;
 }
 
+/* ---------- Score panel ---------- */
+
+.score-panel {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 12px 14px;
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+}
+
+.score-panel-row {
+  display: flex;
+  align-items: stretch;
+  gap: 20px;
+  flex-wrap: wrap;
+}
+
+.stat {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 48px;
+}
+
+.stat-label {
+  font-size: 11px;
+  color: var(--text-faint);
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+}
+
+.stat-value {
+  font-family: ui-monospace, 'SF Mono', Menlo, monospace;
+  font-size: 18px;
+  font-weight: 700;
+  color: var(--text);
+  line-height: 1;
+}
+
+.stat-trend {
+  font-size: 13px;
+  margin-left: 4px;
+  opacity: 0.7;
+}
+
+.score-trend {
+  flex: 1;
+  display: flex;
+  align-items: flex-end;
+  gap: 3px;
+  min-width: 120px;
+  height: 32px;
+  margin-left: auto;
+  padding: 2px 0;
+}
+
+.trend-bar {
+  flex: 1;
+  min-width: 4px;
+  max-width: 14px;
+  border-radius: 2px;
+  opacity: 0.85;
+  transition: height 0.2s;
+}
+
+.weak-points {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding-top: 8px;
+  border-top: 1px dashed var(--border);
+}
+
+.weak-points .weak-label {
+  font-size: 11px;
+  color: var(--text-faint);
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+}
+
+.weak-points ul {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+}
+
+.weak-points li {
+  display: flex;
+  gap: 8px;
+  align-items: baseline;
+  font-size: 13px;
+  color: var(--text-dim);
+}
+
+.weak-count {
+  font-family: ui-monospace, 'SF Mono', Menlo, monospace;
+  font-size: 11px;
+  color: var(--warn);
+  min-width: 24px;
+}
+
+.weak-concept {
+  flex: 1;
+}
+
 /* ---------- Score badge ---------- */
 
 .score-badge {

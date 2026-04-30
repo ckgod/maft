@@ -6,6 +6,7 @@ import {
   type SessionStartResponse,
 } from './api';
 import { ScoreBadge } from './ScoreBadge';
+import { ScorePanel } from './ScorePanel';
 
 export interface Message {
   role: 'assistant' | 'user';
@@ -72,6 +73,8 @@ export function SessionView({ initial, onExit }: SessionViewProps) {
         </div>
         {mastered && <span className="mastered-badge">마스터 도달</span>}
       </header>
+
+      <ScorePanel messages={messages} />
 
       <div className="message-list" ref={scrollRef}>
         {messages.map((m, i) => (
