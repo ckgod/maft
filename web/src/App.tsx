@@ -52,7 +52,7 @@ export default function App() {
 
   if (mode.kind === 'session') {
     return (
-      <div className="app">
+      <div className="app app-session">
         <SessionView initial={mode.data} onExit={() => setMode({ kind: 'list' })} />
       </div>
     );
@@ -60,36 +60,54 @@ export default function App() {
 
   return (
     <div className="app">
-      <header className="header">
-        <h1>Manifest Android Feynman Trainer</h1>
-        <p className="subtitle">파인만 기법으로 안드로이드 CS 토픽을 학습합니다.</p>
+      <header className="masthead">
+        <div className="masthead-row">
+          <span className="eyebrow">Vol. 01 / Phase 1</span>
+          <span className="eyebrow">Feynman Coach</span>
+        </div>
+        <h1 className="masthead-title">
+          Manifest <em>Android</em>
+          <span className="masthead-and">&amp;</span>
+          Feynman Trainer
+        </h1>
+        <p className="masthead-lede">
+          토픽을 자기 말로 풀어내며, 코치의 소크라테스식 역질문을 통해 이해의 격차를 메워가는 학습 도구입니다.
+        </p>
       </header>
 
       <main className="main">
         {topicsError ? (
           <div className="status status-error">
-            <strong>백엔드에 연결할 수 없습니다.</strong>
+            <span className="eyebrow status-tag">Connection error</span>
             <p>{topicsError}</p>
             <p className="hint">server 패키지가 실행 중인지 확인하십시오 (포트 3001).</p>
           </div>
         ) : !topics ? (
-          <div className="status">토픽 목록을 불러오는 중입니다...</div>
+          <div className="status">
+            <span className="eyebrow status-tag">Indexing</span>
+            <p>토픽 목록을 불러오는 중입니다…</p>
+          </div>
         ) : (
-          <section className="topic-list-view">
-            <div className="topic-list-head">
-              <h2>학습할 토픽을 선택하세요</h2>
-              <p className="hint">학습 가능한 토픽 {topics.length}개가 인덱싱되어 있습니다.</p>
-              <input
-                className="topic-search"
-                placeholder="토픽 검색 (예: Context, Compose, Coroutine)"
-                value={filter}
-                onChange={(e) => setFilter(e.target.value)}
-              />
+          <section className="index-view">
+            <div className="index-head">
+              <span className="eyebrow">Table of contents</span>
+              <h2 className="index-title">학습할 토픽을 선택하세요</h2>
+              <div className="index-meta">
+                <span className="index-count">
+                  <em>{topics.length}</em> entries
+                </span>
+                <input
+                  className="index-search"
+                  placeholder="검색 — Context, Compose, Coroutine…"
+                  value={filter}
+                  onChange={(e) => setFilter(e.target.value)}
+                />
+              </div>
             </div>
 
             {startError && (
               <div className="status status-error">
-                <strong>세션을 시작하지 못했습니다.</strong>
+                <span className="eyebrow status-tag">세션 시작 실패</span>
                 <p>{startError}</p>
               </div>
             )}
@@ -97,24 +115,26 @@ export default function App() {
             {filtered.length === 0 ? (
               <p className="status">검색 결과가 없습니다.</p>
             ) : (
-              <ul className="topic-list">
-                {filtered.map((t) => {
+              <ol className="index-list">
+                {filtered.map((t, i) => {
                   const starting = mode.kind === 'starting' && mode.topicId === t.id;
+                  const num = String(i + 1).padStart(2, '0');
                   return (
                     <li
                       key={t.id}
-                      className={`topic-item kind-${t.kind}${starting ? ' starting' : ''}`}
+                      className={`index-row kind-${t.kind}${starting ? ' is-starting' : ''}`}
                       onClick={() => handleSelectTopic(t.id)}
                     >
-                      <span className="topic-id">{shortId(t.id)}</span>
-                      <span className="topic-title">{t.title}</span>
-                      <span className="topic-kind">
-                        {starting ? '시작 중…' : t.kind === 'extra' ? 'E' : 'Q'}
+                      <span className="row-num">{num}</span>
+                      <span className="row-id">{shortId(t.id)}</span>
+                      <span className="row-title">{t.title}</span>
+                      <span className="row-status">
+                        {starting ? 'Starting…' : t.kind === 'extra' ? 'Extra' : 'Question'}
                       </span>
                     </li>
                   );
                 })}
-              </ul>
+              </ol>
             )}
           </section>
         )}
