@@ -20,9 +20,23 @@ interface SessionViewProps {
 }
 
 const RUBRIC_BLOCK_RE = /```json\s*[\s\S]*?\s*```\s*$/m;
+const Q_RE = /^Q(\d+)/;
+const E_RE = /^E(\d+)/;
 
 function stripRubricBlock(text: string): string {
   return text.replace(RUBRIC_BLOCK_RE, '').trimEnd();
+}
+
+function topicNumber(id: string): string {
+  const q = id.match(Q_RE);
+  if (q) return `Q${q[1]}`;
+  const e = id.match(E_RE);
+  if (e) return `E${e[1]}`;
+  return id.slice(0, 8);
+}
+
+function pad2(n: number): string {
+  return String(n).padStart(2, '0');
 }
 
 export function SessionView({ initial, onExit }: SessionViewProps) {
@@ -61,49 +75,75 @@ export function SessionView({ initial, onExit }: SessionViewProps) {
     }
   }
 
+  let userTurn = 0;
+  let coachTurn = 0;
+
   return (
-    <div className="session-view">
-      <header className="session-header">
-        <button className="btn-secondary" onClick={onExit}>
-          ← 토픽 목록
+    <div className="session">
+      <header className="session-head">
+        <button className="link-back" onClick={onExit}>
+          ← Index
         </button>
-        <div className="session-title">
-          <span className="session-topic-id">{initial.topicId.replace(/\.md$/, '')}</span>
-          <h2>{initial.topicTitle}</h2>
+        <div className="session-meta">
+          <span className="eyebrow">Topic · {topicNumber(initial.topicId)}</span>
+          <h2 className="session-h2">{initial.topicTitle}</h2>
         </div>
-        {mastered && <span className="mastered-badge">마스터 도달</span>}
+        {mastered ? (
+          <span className="mastered-pill">Mastered</span>
+        ) : (
+          <span className="eyebrow session-state">In session</span>
+        )}
       </header>
 
       <ScorePanel messages={messages} />
 
-      <div className="message-list" ref={scrollRef}>
-        {messages.map((m, i) => (
-          <article key={i} className={`message message-${m.role}`}>
-            {m.role === 'assistant' && m.rubric && (
-              <div className="message-meta">
-                <ScoreBadge score={m.rubric.score} />
+      <div className="thread" ref={scrollRef}>
+        {messages.map((m, i) => {
+          if (m.role === 'user') {
+            userTurn += 1;
+            return (
+              <article key={i} className="entry entry-user">
+                <span className="eyebrow entry-tag">Response · No. {pad2(userTurn)}</span>
+                <div className="entry-body">
+                  <p>{m.text}</p>
+                </div>
+              </article>
+            );
+          }
+          coachTurn += 1;
+          const isOpening = i === 0;
+          return (
+            <article
+              key={i}
+              className={`entry entry-coach${isOpening ? ' entry-opening' : ''}`}
+            >
+              <div className="entry-tag-row">
+                <span className="eyebrow entry-tag">
+                  {isOpening ? 'Coach · Opening' : `Coach · No. ${pad2(coachTurn - 1)}`}
+                </span>
+                {m.rubric && <ScoreBadge score={m.rubric.score} />}
               </div>
-            )}
-            <div className="message-body">
-              {m.role === 'assistant' ? (
+              <div className="entry-body">
                 <ReactMarkdown>{stripRubricBlock(m.text)}</ReactMarkdown>
-              ) : (
-                <p>{m.text}</p>
-              )}
-              {m.rubric && m.rubric.missedConcepts.length > 0 && (
-                <ul className="missed-list">
-                  {m.rubric.missedConcepts.map((c, j) => (
-                    <li key={j}>{c}</li>
-                  ))}
-                </ul>
-              )}
-            </div>
-          </article>
-        ))}
+                {m.rubric && m.rubric.missedConcepts.length > 0 && (
+                  <aside className="errata">
+                    <span className="eyebrow">Missed concepts</span>
+                    <ul>
+                      {m.rubric.missedConcepts.map((c, j) => (
+                        <li key={j}>{c}</li>
+                      ))}
+                    </ul>
+                  </aside>
+                )}
+              </div>
+            </article>
+          );
+        })}
         {sending && (
-          <article className="message message-assistant message-pending">
-            <div className="message-body">
-              <p className="typing">평가 중입니다…</p>
+          <article className="entry entry-coach entry-pending">
+            <span className="eyebrow entry-tag">Coach · evaluating…</span>
+            <div className="entry-body">
+              <p className="typing">평가 중입니다.</p>
             </div>
           </article>
         )}
@@ -111,20 +151,23 @@ export function SessionView({ initial, onExit }: SessionViewProps) {
 
       {error && (
         <div className="status status-error">
-          <strong>응답을 받지 못했습니다.</strong>
+          <span className="eyebrow status-tag">응답 실패</span>
           <p>{error}</p>
         </div>
       )}
 
-      <div className="input-bar">
+      <div className="composer">
+        <span className="eyebrow composer-tag">
+          Respond — ⌘/Ctrl + Enter to submit
+        </span>
         <textarea
           rows={3}
           value={input}
           onChange={(e) => setInput(e.target.value)}
           placeholder={
             mastered
-              ? '이 토픽은 마스터에 도달했습니다. 더 깊은 후속 질문을 던져도 좋고, 토픽 목록으로 돌아가도 됩니다.'
-              : '자기 말로 설명해 주세요... (⌘/Ctrl + Enter 로 전송)'
+              ? '이 토픽은 마스터에 도달했습니다. 더 깊은 후속 질문을 던져도 좋습니다.'
+              : '자기 말로 풀어 설명해 보세요…'
           }
           onKeyDown={(e) => {
             if ((e.metaKey || e.ctrlKey) && e.key === 'Enter') {
@@ -135,7 +178,7 @@ export function SessionView({ initial, onExit }: SessionViewProps) {
           disabled={sending}
         />
         <button onClick={() => void handleSend()} disabled={sending || !input.trim()}>
-          {sending ? '전송 중…' : '제출'}
+          {sending ? 'Sending' : 'Submit'}
         </button>
       </div>
     </div>
