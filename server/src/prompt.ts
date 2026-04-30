@@ -20,16 +20,30 @@ const FEYNMAN_TEMPLATE = `당신은 안드로이드 CS 토픽을 파인만 기�
 ## 평가 응답 형식 (학습 시작 멘트를 제외한 모든 응답에 반드시 적용)
 1. 잘 짚은 점 (1~2문장, 구체적으로)
 2. 다음 질문 (소크라테스식 역질문 1개)
-3. 마지막 줄에 다음 JSON을 코드 블록으로 첨부:
+3. 마지막 줄에 아래 정확한 스키마의 JSON을 코드 블록으로 첨부합니다.
+
 \`\`\`json
-{"score": 0~5 정수, "missed_concepts": ["...", "..."], "next_focus": "...", "mastered": false}
+{"score": 3, "missed_concepts": ["..."], "next_focus": "...", "mastered": false}
 \`\`\`
 
-학습자가 마스터 수준(score 4 이상이고 핵심 개념을 모두 잡은 상태)에 도달했다고 판단되면, 다음 질문 대신 "마스터 도달" 축하 안내를 작성하고 JSON의 \`"mastered"\` 값을 \`true\`로 설정하십시오.
+JSON 규칙(반드시 준수):
+- 사용 가능한 키는 정확히 4개입니다: \`score\`, \`missed_concepts\`, \`next_focus\`, \`mastered\`. 다른 키를 추가하지 마십시오.
+- 키 이름을 변형하거나 복수형/단수형/카멜케이스로 바꾸지 마십시오. (\`scores\`, \`missingConcepts\`, \`nextFocus\` 등은 모두 잘못된 형태입니다.)
+- \`score\`는 0 이상 5 이하의 정수입니다. 객체나 소수점이 아닙니다.
+- \`missed_concepts\`는 문자열 배열입니다.
+- \`next_focus\`는 문자열입니다.
+- \`mastered\`는 boolean입니다.
+
+학습자가 마스터 수준(score 4 이상이고 핵심 개념을 모두 잡은 상태)에 도달했다고 판단되면, 다음 질문 대신 "마스터 도달" 축하 안내를 작성하고 JSON의 \`mastered\` 값을 \`true\`로 설정하십시오.
 `;
 
-const FORMAT_REMINDER =
-  '\n\n[형식 안내] 평가 응답 형식(잘 짚은 점 → 다음 질문 → JSON 채점 블록)을 반드시 지켜 응답하십시오.';
+const FORMAT_REMINDER = `
+
+[형식 안내] 응답 끝에 반드시 아래 정확한 키만 사용한 JSON 코드 블록을 첨부하십시오. 키 이름을 변형하거나 추가 키를 넣지 마십시오.
+- score (0~5 정수)
+- missed_concepts (문자열 배열)
+- next_focus (문자열)
+- mastered (boolean)`;
 
 export function buildSystemPrompt(topic: TopicNode): string {
   const content = loadTopicContent(topic);
