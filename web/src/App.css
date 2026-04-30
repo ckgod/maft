@@ -393,6 +393,308 @@
 }
 
 /* ==========================================================================
+   Session view — schematic article flow
+   ========================================================================== */
+
+.session {
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+  gap: 20px;
+  min-height: 0;
+}
+
+.session-head {
+  display: grid;
+  grid-template-columns: auto 1fr auto;
+  gap: 28px;
+  align-items: end;
+  padding-bottom: 16px;
+  border-bottom: 1px solid var(--rule);
+}
+
+.link-back {
+  background: transparent;
+  border: 1px solid var(--rule);
+  padding: 7px 12px;
+  color: var(--ink-3);
+  font-family: var(--font-mono);
+  font-size: var(--tt-xs);
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  cursor: pointer;
+  align-self: end;
+  transition:
+    color 0.18s var(--ease-out),
+    border-color 0.18s var(--ease-out),
+    background 0.18s var(--ease-out);
+}
+
+.link-back:hover {
+  color: var(--blueprint);
+  border-color: var(--blueprint);
+  background: var(--blueprint-soft);
+}
+
+.session-meta {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.session-h2 {
+  font-family: var(--font-display);
+  font-size: var(--tt-xl);
+  font-weight: 600;
+  letter-spacing: -0.02em;
+  line-height: 1.2;
+  color: var(--ink);
+}
+
+.mastered-pill {
+  align-self: end;
+  font-family: var(--font-mono);
+  font-size: var(--tt-xs);
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  padding: 6px 12px;
+  border: 1px solid var(--moss);
+  color: var(--moss);
+  background: rgba(110, 231, 183, 0.06);
+}
+
+.session-state {
+  align-self: end;
+}
+
+/* ---- Thread (messages) ---- */
+
+.thread {
+  flex: 1;
+  overflow-y: auto;
+  padding: 8px 4px 28px 0;
+  display: flex;
+  flex-direction: column;
+  gap: 28px;
+  scrollbar-width: thin;
+  scrollbar-color: var(--rule) transparent;
+}
+
+.thread::-webkit-scrollbar {
+  width: 6px;
+}
+
+.thread::-webkit-scrollbar-thumb {
+  background: var(--rule);
+}
+
+.entry {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  max-width: 760px;
+}
+
+.entry-user {
+  align-self: flex-end;
+  text-align: left;
+  max-width: 640px;
+}
+
+.entry-tag {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.entry-tag-row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
+.entry-body {
+  position: relative;
+  padding: 16px 20px 16px 22px;
+  background: var(--paper-1);
+  border: 1px solid var(--rule);
+  border-left-width: 2px;
+}
+
+.entry-coach .entry-body {
+  border-left-color: var(--blueprint-line);
+}
+
+.entry-coach.entry-opening .entry-body {
+  border-left-color: var(--blueprint);
+}
+
+.entry-user .entry-body {
+  background: transparent;
+  border-color: var(--rule-soft);
+  border-left-color: var(--ink-4);
+}
+
+.entry-body p {
+  margin: 0 0 10px;
+  line-height: 1.7;
+  color: var(--ink);
+}
+
+.entry-body p:last-child {
+  margin-bottom: 0;
+}
+
+.entry-body h1,
+.entry-body h2,
+.entry-body h3,
+.entry-body h4 {
+  font-family: var(--font-display);
+  font-weight: 600;
+  font-size: var(--tt-m);
+  margin: 16px 0 6px;
+  letter-spacing: -0.015em;
+  color: var(--ink);
+}
+
+.entry-body strong {
+  color: var(--ink);
+  font-weight: 600;
+}
+
+.entry-body em {
+  color: var(--blueprint);
+  font-style: normal;
+  font-weight: 500;
+}
+
+.entry-body code {
+  background: var(--paper-2);
+  border: 1px solid var(--rule);
+  padding: 1px 6px;
+  border-radius: 0;
+  color: var(--blueprint);
+  font-size: 0.88em;
+}
+
+.entry-body pre {
+  background: var(--paper-2);
+  border: 1px solid var(--rule);
+  padding: 12px 14px;
+  overflow-x: auto;
+  margin: 12px 0;
+}
+
+.entry-body pre code {
+  background: transparent;
+  border: none;
+  padding: 0;
+  color: var(--ink-2);
+  font-size: 12px;
+}
+
+.entry-body ul,
+.entry-body ol {
+  margin: 8px 0 12px;
+  padding-left: 22px;
+  color: var(--ink);
+}
+
+.entry-body ul li::marker {
+  color: var(--blueprint);
+  font-weight: 700;
+}
+
+.entry-body hr {
+  border: none;
+  border-top: 1px dashed var(--rule);
+  margin: 14px 0;
+}
+
+.entry-body blockquote {
+  border-left: 2px solid var(--blueprint);
+  margin: 12px 0;
+  padding: 4px 14px;
+  color: var(--ink-2);
+}
+
+.entry-pending .entry-body {
+  border-style: dashed;
+}
+
+.typing {
+  color: var(--ink-3);
+}
+
+/* Errata = missed concepts */
+
+.errata {
+  margin-top: 18px;
+  padding: 12px 14px 12px 16px;
+  border: 1px dashed var(--rule);
+  border-left: 2px solid var(--sienna);
+  background: rgba(240, 138, 124, 0.04);
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.errata ul {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+}
+
+.errata li {
+  position: relative;
+  padding-left: 14px;
+  font-size: var(--tt-body);
+  color: var(--ink-2);
+  line-height: 1.55;
+}
+
+.errata li::before {
+  content: '–';
+  position: absolute;
+  left: 0;
+  color: var(--sienna);
+}
+
+/* ---- Composer (input bar) ---- */
+
+.composer {
+  display: grid;
+  grid-template-columns: 1fr auto;
+  grid-template-rows: auto auto;
+  gap: 8px 14px;
+  padding-top: 14px;
+  border-top: 1px solid var(--rule);
+}
+
+.composer-tag {
+  grid-column: 1 / -1;
+  color: var(--ink-3);
+}
+
+.composer textarea {
+  resize: vertical;
+  min-height: 80px;
+  font-family: var(--font-body);
+  font-size: var(--tt-body);
+  line-height: 1.6;
+  padding: 12px 14px;
+}
+
+.composer button {
+  align-self: stretch;
+  min-width: 110px;
+}
+
+/* ==========================================================================
    Responsive
    ========================================================================== */
 
