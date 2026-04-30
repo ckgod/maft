@@ -1,11 +1,19 @@
 export type TopicKind = 'category' | 'question' | 'detail' | 'extra';
 
+export interface TopicStats {
+  attempts: number;
+  bestScore: number | null;
+  lastScore: number | null;
+  mastered: boolean;
+}
+
 export interface Topic {
   id: string;
   title: string;
   kind: TopicKind;
   depth: number;
   parentId: string | null;
+  stats: TopicStats;
 }
 
 export interface Category {

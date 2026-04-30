@@ -294,7 +294,7 @@
 
 .index-row {
   display: grid;
-  grid-template-columns: 36px 110px 1fr auto 16px;
+  grid-template-columns: 36px 110px 1fr 144px 16px;
   gap: 18px;
   align-items: center;
   padding: 13px 4px 12px;
@@ -478,10 +478,29 @@
   text-transform: lowercase;
   padding-left: 8px;
   border-left: 1px dashed var(--rule);
+  white-space: nowrap;
+  font-variant-numeric: tabular-nums;
 }
 
 .index-row.kind-extra .row-kind {
   color: var(--amber);
+}
+
+/* attempt / mastered states win over kind-extra */
+.row-kind.is-attempted,
+.index-row.kind-extra .row-kind.is-attempted {
+  color: var(--blueprint);
+  border-left-color: var(--blueprint-line);
+}
+
+.row-kind.is-mastered,
+.index-row.kind-extra .row-kind.is-mastered {
+  color: var(--moss);
+  border-left-color: rgba(110, 231, 183, 0.35);
+}
+
+.index-row.is-mastered .row-title {
+  color: var(--ink-2);
 }
 
 .row-arrow {

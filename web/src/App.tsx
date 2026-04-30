@@ -13,6 +13,22 @@ function shortId(id: string): string {
   return id.replace(/\.md$/, '');
 }
 
+function rowKindLabel(t: Topic, starting: boolean): string {
+  if (starting) return 'starting';
+  if (t.stats.mastered) return '★ mastered';
+  if (t.stats.attempts > 0 && t.stats.bestScore !== null) {
+    return `best ${t.stats.bestScore}/5 · ×${t.stats.attempts}`;
+  }
+  return t.kind === 'extra' ? 'extra' : 'question';
+}
+
+function rowKindClass(t: Topic, starting: boolean): string {
+  if (starting) return '';
+  if (t.stats.mastered) return ' is-mastered';
+  if (t.stats.attempts > 0) return ' is-attempted';
+  return '';
+}
+
 function categoryPrefix(id: string): string {
   const m = id.match(/^(\d+-\d+)/);
   return m ? m[1] : id.replace(/\.md$/, '').slice(0, 4);
@@ -37,13 +53,17 @@ export default function App() {
   const [mode, setMode] = useState<AppMode>({ kind: 'list' });
   const [startError, setStartError] = useState<string | null>(null);
 
-  useEffect(() => {
+  function loadTopics() {
     listTopics()
       .then((res) => {
         setTopics(res.topics);
         setCategories(res.categories);
       })
       .catch((e) => setTopicsError(e instanceof Error ? e.message : String(e)));
+  }
+
+  useEffect(() => {
+    loadTopics();
   }, []);
 
   const sideCategories = useMemo(
@@ -99,7 +119,13 @@ export default function App() {
   if (mode.kind === 'session') {
     return (
       <div className="app app-session">
-        <SessionView initial={mode.data} onExit={() => setMode({ kind: 'list' })} />
+        <SessionView
+          initial={mode.data}
+          onExit={() => {
+            setMode({ kind: 'list' });
+            loadTopics();
+          }}
+        />
       </div>
     );
   }
@@ -195,14 +221,14 @@ export default function App() {
                   return (
                     <li
                       key={t.id}
-                      className={`index-row kind-${t.kind}${starting ? ' is-starting' : ''}`}
+                      className={`index-row kind-${t.kind}${starting ? ' is-starting' : ''}${t.stats.mastered ? ' is-mastered' : ''}`}
                       onClick={() => handleSelectTopic(t.id)}
                     >
                       <span className="row-num">{num}</span>
                       <span className="row-id">{shortId(t.id)}</span>
                       <span className="row-title">{t.title}</span>
-                      <span className="row-kind">
-                        {starting ? 'starting' : t.kind === 'extra' ? 'extra' : 'question'}
+                      <span className={`row-kind${rowKindClass(t, starting)}`}>
+                        {rowKindLabel(t, starting)}
                       </span>
                       {starting ? (
                         <span className="row-loading" aria-label="세션 시작 중">

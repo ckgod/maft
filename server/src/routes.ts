@@ -9,18 +9,31 @@ import {
   listSessions,
   updateSessionMeta,
 } from './sessions.js';
+import { getTopicStatsMap } from './stats.js';
 
 export function createRouter(index: TopicIndex): Router {
   const router = Router();
 
   const getTopics: RequestHandler = (_req, res) => {
-    const topics = index.questions.map((t) => ({
-      id: t.id,
-      title: t.title,
-      kind: t.kind,
-      depth: t.depth,
-      parentId: t.parentId,
-    }));
+    const stats = getTopicStatsMap();
+    const topics = index.questions.map((t) => {
+      const s = stats.get(t.id);
+      return {
+        id: t.id,
+        title: t.title,
+        kind: t.kind,
+        depth: t.depth,
+        parentId: t.parentId,
+        stats: s
+          ? {
+              attempts: s.attempts,
+              bestScore: s.bestScore,
+              lastScore: s.lastScore,
+              mastered: s.mastered,
+            }
+          : { attempts: 0, bestScore: null, lastScore: null, mastered: false },
+      };
+    });
     const categories = [...index.byId.values()]
       .filter((n) => n.kind === 'category')
       .map((c) => ({
