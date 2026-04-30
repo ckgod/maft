@@ -212,3 +212,93 @@ code {
   text-transform: uppercase;
   color: var(--ink-3);
 }
+
+/* ==========================================================================
+   Entrance animations — staggered editorial reveal
+   ========================================================================== */
+
+@keyframes rise-fade {
+  from {
+    opacity: 0;
+    transform: translateY(10px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes rule-grow {
+  from {
+    transform: scaleX(0);
+    transform-origin: left;
+  }
+  to {
+    transform: scaleX(1);
+    transform-origin: left;
+  }
+}
+
+@keyframes bar-grow {
+  from {
+    height: 0%;
+    opacity: 0;
+  }
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  .masthead {
+    animation: rise-fade 0.7s var(--ease-out) both;
+  }
+  .masthead::before,
+  .masthead::after {
+    animation: rule-grow 0.9s var(--ease-out) both;
+  }
+  .masthead-title {
+    animation: rise-fade 0.8s 0.1s var(--ease-out) both;
+  }
+  .masthead-lede {
+    animation: rise-fade 0.8s 0.18s var(--ease-out) both;
+  }
+
+  .index-head {
+    animation: rise-fade 0.6s 0.05s var(--ease-out) both;
+  }
+
+  .index-row {
+    animation: rise-fade 0.5s var(--ease-out) both;
+  }
+  .index-row:nth-child(1) { animation-delay: 0.10s; }
+  .index-row:nth-child(2) { animation-delay: 0.14s; }
+  .index-row:nth-child(3) { animation-delay: 0.18s; }
+  .index-row:nth-child(4) { animation-delay: 0.22s; }
+  .index-row:nth-child(5) { animation-delay: 0.26s; }
+  .index-row:nth-child(6) { animation-delay: 0.30s; }
+  .index-row:nth-child(7) { animation-delay: 0.34s; }
+  .index-row:nth-child(8) { animation-delay: 0.38s; }
+  .index-row:nth-child(9) { animation-delay: 0.42s; }
+  .index-row:nth-child(n+10) { animation-delay: 0.46s; }
+
+  .session-head {
+    animation: rise-fade 0.5s var(--ease-out) both;
+  }
+  .rubric-figure {
+    animation: rise-fade 0.5s 0.08s var(--ease-out) both;
+  }
+  .thread > .entry {
+    animation: rise-fade 0.5s var(--ease-out) both;
+  }
+  .composer {
+    animation: rise-fade 0.5s 0.16s var(--ease-out) both;
+  }
+
+  .trend-bar {
+    animation: bar-grow 0.55s var(--ease-out) both;
+  }
+  .trend-bar:nth-child(1) { animation-delay: 0.10s; }
+  .trend-bar:nth-child(2) { animation-delay: 0.16s; }
+  .trend-bar:nth-child(3) { animation-delay: 0.22s; }
+  .trend-bar:nth-child(4) { animation-delay: 0.28s; }
+  .trend-bar:nth-child(5) { animation-delay: 0.34s; }
+  .trend-bar:nth-child(n+6) { animation-delay: 0.40s; }
+}
