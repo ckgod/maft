@@ -62,16 +62,14 @@ export default function App() {
     <div className="app">
       <header className="masthead">
         <div className="masthead-row">
-          <span className="eyebrow">Vol. 01 · Phase 1</span>
-          <span className="eyebrow">Feynman Coach</span>
+          <span className="eyebrow">MAFT · v0.1</span>
+          <span className="eyebrow">Schematic / 01</span>
         </div>
         <div className="masthead-body">
-          <h1 className="masthead-title">
-            M<em>A</em>FT
-          </h1>
+          <h1 className="masthead-title">MAFT</h1>
           <p className="masthead-lede">
             <span className="masthead-fullname">Manifest Android Feynman Trainer</span>
-            <span className="masthead-sep">·</span>
+            <span className="masthead-sep">—</span>
             토픽을 자기 말로 풀어내며 코치의 소크라테스식 역질문으로 이해의 격차를 메우는 학습 도구.
           </p>
         </div>
@@ -80,23 +78,24 @@ export default function App() {
       <main className="main">
         {topicsError ? (
           <div className="status status-error">
-            <span className="eyebrow status-tag">Connection error</span>
+            <span className="eyebrow status-tag">! Connection error</span>
             <p>{topicsError}</p>
             <p className="hint">server 패키지가 실행 중인지 확인하십시오 (포트 3001).</p>
           </div>
         ) : !topics ? (
           <div className="status">
-            <span className="eyebrow status-tag">Indexing</span>
+            <span className="eyebrow status-tag">⋯ indexing</span>
             <p>토픽 목록을 불러오는 중입니다…</p>
           </div>
         ) : (
           <section className="index-view">
             <div className="index-head">
-              <span className="eyebrow">Table of contents</span>
-              <h2 className="index-title">학습할 토픽을 선택하세요</h2>
+              <span className="eyebrow">// table of contents</span>
+              <h2 className="index-title">학습할 토픽을 선택하세요.</h2>
               <div className="index-meta">
                 <span className="index-count">
-                  <em>{topics.length}</em> entries
+                  <span className="index-count-num">{topics.length}</span>
+                  <span className="index-count-label">topics indexed</span>
                 </span>
                 <input
                   className="index-search"
@@ -109,7 +108,7 @@ export default function App() {
 
             {startError && (
               <div className="status status-error">
-                <span className="eyebrow status-tag">세션 시작 실패</span>
+                <span className="eyebrow status-tag">! 세션 시작 실패</span>
                 <p>{startError}</p>
               </div>
             )}
@@ -130,8 +129,9 @@ export default function App() {
                       <span className="row-num">{num}</span>
                       <span className="row-id">{shortId(t.id)}</span>
                       <span className="row-title">{t.title}</span>
-                      <span className="row-status">
-                        {starting ? 'Starting…' : t.kind === 'extra' ? 'Extra' : 'Question'}
+                      <span className="row-kind">{t.kind === 'extra' ? 'extra' : 'question'}</span>
+                      <span className="row-arrow" aria-hidden="true">
+                        {starting ? '…' : '→'}
                       </span>
                     </li>
                   );
