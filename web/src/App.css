@@ -695,6 +695,235 @@
 }
 
 /* ==========================================================================
+   Rubric figure — schematic chart
+   ========================================================================== */
+
+.rubric-figure {
+  position: relative;
+  border: 1px solid var(--rule);
+  padding: 16px 18px 14px;
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  background: var(--paper-1);
+}
+
+/* corner ticks like a chart frame */
+.rubric-figure::before,
+.rubric-figure::after {
+  content: '';
+  position: absolute;
+  width: 8px;
+  height: 8px;
+  border: 1px solid var(--blueprint-line);
+}
+
+.rubric-figure::before {
+  top: -1px;
+  left: -1px;
+  border-right: none;
+  border-bottom: none;
+}
+
+.rubric-figure::after {
+  bottom: -1px;
+  right: -1px;
+  border-left: none;
+  border-top: none;
+}
+
+.rubric-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+}
+
+.rubric-head-meta {
+  font-family: var(--font-mono);
+  letter-spacing: 0.16em;
+}
+
+.rubric-grid {
+  display: grid;
+  grid-template-columns: repeat(4, auto) 1fr;
+  gap: 32px;
+  align-items: end;
+}
+
+.rubric-stat {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  min-width: 52px;
+  border-left: 1px dashed var(--rule);
+  padding-left: 14px;
+}
+
+.rubric-stat:first-child {
+  border-left: none;
+  padding-left: 0;
+}
+
+.stat-label {
+  font-family: var(--font-mono);
+  font-size: var(--tt-xs);
+  color: var(--ink-3);
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+}
+
+.stat-value {
+  font-family: var(--font-display);
+  font-size: 26px;
+  font-weight: 600;
+  color: var(--ink);
+  letter-spacing: -0.025em;
+  line-height: 1;
+  font-variant-numeric: tabular-nums;
+}
+
+.stat-trend {
+  margin-left: 6px;
+  font-size: 0.6em;
+  opacity: 0.7;
+  font-family: var(--font-mono);
+  vertical-align: 0.18em;
+  font-weight: 500;
+}
+
+/* Trend chart */
+
+.rubric-trend {
+  display: grid;
+  grid-template-columns: 16px 1fr;
+  gap: 8px;
+  align-items: stretch;
+  height: 52px;
+  min-width: 160px;
+}
+
+.trend-rule {
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  font-family: var(--font-mono);
+  font-size: var(--tt-xs);
+  color: var(--ink-4);
+  border-right: 1px dashed var(--rule);
+  padding-right: 4px;
+  letter-spacing: 0.05em;
+}
+
+.trend-axis-label {
+  line-height: 1;
+}
+
+.trend-track {
+  display: flex;
+  gap: 3px;
+  align-items: flex-end;
+  height: 100%;
+  padding: 2px 0;
+  position: relative;
+}
+
+.trend-track::before {
+  content: '';
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  border-bottom: 1px solid var(--rule);
+}
+
+.trend-bar {
+  flex: 1;
+  min-width: 5px;
+  max-width: 14px;
+  opacity: 0.85;
+  transition:
+    height 0.25s var(--ease-out),
+    opacity 0.18s var(--ease-out);
+}
+
+.trend-bar:hover {
+  opacity: 1;
+}
+
+/* Recurring gaps */
+
+.rubric-weak {
+  border-top: 1px dashed var(--rule);
+  padding-top: 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.rubric-weak-label {
+  color: var(--sienna);
+}
+
+.rubric-weak ul {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.rubric-weak li {
+  display: grid;
+  grid-template-columns: 32px 1fr;
+  gap: 12px;
+  align-items: baseline;
+  font-size: var(--tt-s);
+  color: var(--ink-2);
+  line-height: 1.5;
+}
+
+.weak-count {
+  font-family: var(--font-mono);
+  color: var(--sienna);
+  font-variant-numeric: tabular-nums;
+  letter-spacing: 0.04em;
+  font-size: var(--tt-xs);
+}
+
+.weak-concept {
+  color: var(--ink);
+}
+
+/* Score badge */
+
+.score-badge {
+  display: inline-flex;
+  align-items: baseline;
+  gap: 2px;
+  padding: 1px 8px;
+  border: 1px solid;
+  border-radius: 0;
+  font-family: var(--font-mono);
+  font-size: var(--tt-xs);
+  font-weight: 500;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+
+.score-num {
+  font-size: 1.2em;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+  line-height: 1;
+}
+
+.score-max {
+  font-size: 0.85em;
+  opacity: 0.6;
+}
+
+/* ==========================================================================
    Responsive
    ========================================================================== */
 
