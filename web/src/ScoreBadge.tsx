@@ -4,18 +4,20 @@ interface ScoreBadgeProps {
 }
 
 function colorForScore(score: number): string {
-  if (score <= 1) return 'var(--err)';
-  if (score <= 2) return 'var(--warn)';
-  if (score <= 3) return '#a3b8d8';
-  return 'var(--ok)';
+  if (score <= 1) return 'var(--sienna)';
+  if (score <= 2) return 'var(--amber)';
+  if (score <= 3) return 'var(--slate)';
+  return 'var(--moss)';
 }
 
 export function ScoreBadge({ score, showMax = true }: ScoreBadgeProps) {
   const color = colorForScore(score);
   return (
-    <div className="score-badge" style={{ borderColor: color, color }}>
+    <span className="score-badge" style={{ borderColor: color, color }}>
       <span className="score-num">{score}</span>
       {showMax && <span className="score-max">/5</span>}
-    </div>
+    </span>
   );
 }
+
+export { colorForScore };

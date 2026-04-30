@@ -1,5 +1,6 @@
 import { useMemo } from 'react';
 import type { Message } from './SessionView';
+import { colorForScore } from './ScoreBadge';
 
 interface ScorePanelProps {
   messages: Message[];
@@ -39,13 +40,6 @@ function computeStats(messages: Message[]): Stats {
   return { turns, avg, best, latest, scores, topMissed };
 }
 
-function colorForScore(score: number): string {
-  if (score <= 1) return 'var(--err)';
-  if (score <= 2) return 'var(--warn)';
-  if (score <= 3) return '#a3b8d8';
-  return 'var(--ok)';
-}
-
 function trendIndicator(scores: number[]): string {
   if (scores.length < 2) return '';
   const last = scores[scores.length - 1]!;
@@ -61,54 +55,70 @@ export function ScorePanel({ messages }: ScorePanelProps) {
   if (stats.turns === 0) return null;
 
   return (
-    <aside className="score-panel">
-      <div className="score-panel-row">
-        <div className="stat">
-          <span className="stat-label">턴</span>
+    <aside className="rubric-figure">
+      <div className="rubric-head">
+        <span className="eyebrow">Figure 01 · Rubric</span>
+        <span className="eyebrow rubric-head-meta">
+          n = {String(stats.turns).padStart(2, '0')}
+        </span>
+      </div>
+
+      <div className="rubric-grid">
+        <div className="rubric-stat">
+          <span className="stat-label">Turns</span>
           <span className="stat-value">{stats.turns}</span>
         </div>
-        <div className="stat">
-          <span className="stat-label">최근</span>
+        <div className="rubric-stat">
+          <span className="stat-label">Latest</span>
           <span className="stat-value" style={{ color: colorForScore(stats.latest) }}>
             {stats.latest}
             <span className="stat-trend">{trendIndicator(stats.scores)}</span>
           </span>
         </div>
-        <div className="stat">
-          <span className="stat-label">평균</span>
-          <span className="stat-value" style={{ color: colorForScore(Math.round(stats.avg)) }}>
+        <div className="rubric-stat">
+          <span className="stat-label">Average</span>
+          <span
+            className="stat-value"
+            style={{ color: colorForScore(Math.round(stats.avg)) }}
+          >
             {stats.avg.toFixed(1)}
           </span>
         </div>
-        <div className="stat">
-          <span className="stat-label">최고</span>
+        <div className="rubric-stat">
+          <span className="stat-label">Best</span>
           <span className="stat-value" style={{ color: colorForScore(stats.best) }}>
             {stats.best}
           </span>
         </div>
 
-        <div className="score-trend" aria-label="턴별 점수 추이">
-          {stats.scores.map((s, i) => (
-            <div
-              key={i}
-              className="trend-bar"
-              style={{
-                height: `${Math.max((s / 5) * 100, 8)}%`,
-                background: colorForScore(s),
-              }}
-              title={`턴 ${i + 1}: ${s}/5`}
-            />
-          ))}
+        <div className="rubric-trend" aria-label="턴별 점수 추이">
+          <div className="trend-rule">
+            <span className="trend-axis-label">5</span>
+            <span className="trend-axis-label">0</span>
+          </div>
+          <div className="trend-track">
+            {stats.scores.map((s, i) => (
+              <div
+                key={i}
+                className="trend-bar"
+                style={{
+                  height: `${Math.max((s / 5) * 100, 6)}%`,
+                  background: colorForScore(s),
+                }}
+                title={`Turn ${i + 1}: ${s}/5`}
+              />
+            ))}
+          </div>
         </div>
       </div>
 
       {stats.topMissed.length > 0 && (
-        <div className="weak-points">
-          <span className="weak-label">자주 빠진 개념</span>
+        <div className="rubric-weak">
+          <span className="eyebrow rubric-weak-label">Recurring gaps</span>
           <ul>
             {stats.topMissed.map((m) => (
               <li key={m.concept}>
-                <span className="weak-count">×{m.count}</span>
+                <span className="weak-count">×{String(m.count).padStart(2, '0')}</span>
                 <span className="weak-concept">{m.concept}</span>
               </li>
             ))}

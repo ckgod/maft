@@ -574,28 +574,51 @@
   min-width: 120px;
 }
 
-/* ---- Score panel/badge — minimum tokens (재정렬은 다음 커밋) ---- */
+/* ==========================================================================
+   Rubric figure — editorial chart for the score panel
+   ========================================================================== */
 
-.score-panel {
-  display: flex;
-  flex-direction: column;
-  gap: 10px;
-  padding: 14px 0;
+.rubric-figure {
+  position: relative;
   border-top: 1px solid var(--rule);
   border-bottom: 1px solid var(--rule);
-}
-
-.score-panel-row {
-  display: flex;
-  gap: 28px;
-  align-items: baseline;
-  flex-wrap: wrap;
-}
-
-.stat {
+  padding: 18px 0 16px;
   display: flex;
   flex-direction: column;
-  gap: 4px;
+  gap: 16px;
+}
+
+.rubric-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  padding-bottom: 4px;
+}
+
+.rubric-head-meta {
+  font-family: var(--font-mono);
+  letter-spacing: 0.16em;
+}
+
+.rubric-grid {
+  display: grid;
+  grid-template-columns: repeat(4, auto) 1fr;
+  gap: 36px;
+  align-items: end;
+}
+
+.rubric-stat {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  min-width: 56px;
+  border-left: 1px solid var(--rule-soft);
+  padding-left: 14px;
+}
+
+.rubric-stat:first-child {
+  border-left: none;
+  padding-left: 0;
 }
 
 .stat-label {
@@ -607,93 +630,155 @@
 }
 
 .stat-value {
-  font-family: var(--font-mono);
-  font-size: var(--tt-l);
+  font-family: var(--font-display);
+  font-size: 32px;
+  font-weight: 350;
   color: var(--ink);
-  font-weight: 500;
+  letter-spacing: -0.02em;
+  line-height: 1;
+  font-variation-settings: 'opsz' 36;
   font-variant-numeric: tabular-nums;
 }
 
 .stat-trend {
-  margin-left: 4px;
-  font-size: 0.7em;
-  opacity: 0.7;
+  margin-left: 6px;
+  font-size: 0.55em;
+  opacity: 0.65;
+  font-family: var(--font-mono);
+  vertical-align: 0.18em;
 }
 
-.score-trend {
+/* Trend chart */
+
+.rubric-trend {
+  display: grid;
+  grid-template-columns: 16px 1fr;
+  gap: 8px;
+  align-items: stretch;
+  height: 56px;
+  min-width: 160px;
+}
+
+.trend-rule {
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  font-family: var(--font-mono);
+  font-size: var(--tt-xs);
+  color: var(--ink-4);
+  border-right: 1px solid var(--rule-soft);
+  padding-right: 4px;
+  letter-spacing: 0.05em;
+}
+
+.trend-axis-label {
+  line-height: 1;
+}
+
+.trend-track {
   display: flex;
   gap: 3px;
   align-items: flex-end;
-  height: 32px;
-  min-width: 120px;
-  margin-left: auto;
+  height: 100%;
   padding: 2px 0;
+  position: relative;
+}
+
+.trend-track::before {
+  content: '';
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  border-bottom: 1px solid var(--rule-soft);
 }
 
 .trend-bar {
   flex: 1;
-  min-width: 4px;
-  max-width: 12px;
-  border-radius: 1px;
+  min-width: 5px;
+  max-width: 14px;
+  opacity: 0.9;
+  transition:
+    height 0.25s var(--ease-out),
+    opacity 0.2s var(--ease-out);
 }
 
-.weak-points {
-  padding-top: 10px;
+.trend-bar:hover {
+  opacity: 1;
+}
+
+/* Recurring gaps */
+
+.rubric-weak {
   border-top: 1px dashed var(--rule);
+  padding-top: 12px;
   display: flex;
   flex-direction: column;
   gap: 6px;
 }
 
-.weak-points .weak-label {
-  color: var(--ink-3);
+.rubric-weak-label {
+  color: var(--sienna);
 }
 
-.weak-points ul {
+.rubric-weak ul {
   list-style: none;
   margin: 0;
   padding: 0;
   display: flex;
   flex-direction: column;
-  gap: 3px;
+  gap: 4px;
 }
 
-.weak-points li {
-  display: flex;
+.rubric-weak li {
+  display: grid;
+  grid-template-columns: 32px 1fr;
   gap: 12px;
   align-items: baseline;
   font-size: var(--tt-s);
   color: var(--ink-2);
+  line-height: 1.5;
 }
 
 .weak-count {
   font-family: var(--font-mono);
   color: var(--sienna);
-  min-width: 28px;
   font-variant-numeric: tabular-nums;
+  letter-spacing: 0.04em;
+  font-size: var(--tt-xs);
 }
+
+.weak-concept {
+  color: var(--ink);
+}
+
+/* Score badge */
 
 .score-badge {
   display: inline-flex;
   align-items: baseline;
   gap: 2px;
-  padding: 2px 8px;
+  padding: 1px 8px;
   border: 1px solid;
   border-radius: 0;
   font-family: var(--font-mono);
-  font-size: var(--tt-s);
+  font-size: var(--tt-xs);
   font-weight: 500;
-  letter-spacing: 0.04em;
+  letter-spacing: 0.06em;
   background: rgba(245, 239, 223, 0.02);
+  text-transform: uppercase;
 }
 
 .score-num {
-  font-size: 1em;
+  font-size: 1.2em;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+  line-height: 1;
 }
 
 .score-max {
-  font-size: 0.7em;
-  opacity: 0.7;
+  font-size: 0.85em;
+  opacity: 0.6;
 }
 
 /* ---- Responsive ---- */
