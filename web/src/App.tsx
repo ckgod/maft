@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from 'react';
 import {
   listTopics,
   startSession,
+  type Category,
   type SessionStartResponse,
   type Topic,
 } from './api';
@@ -12,6 +13,16 @@ function shortId(id: string): string {
   return id.replace(/\.md$/, '');
 }
 
+function categoryPrefix(id: string): string {
+  const m = id.match(/^(\d+-\d+)/);
+  return m ? m[1] : id.replace(/\.md$/, '').slice(0, 4);
+}
+
+function categoryLabel(title: string): string {
+  const cleaned = title.replace(/^[\d.\)\s-]+/, '').trim();
+  return cleaned || title;
+}
+
 type AppMode =
   | { kind: 'list' }
   | { kind: 'starting'; topicId: string }
@@ -19,23 +30,58 @@ type AppMode =
 
 export default function App() {
   const [topics, setTopics] = useState<Topic[] | null>(null);
+  const [categories, setCategories] = useState<Category[]>([]);
   const [topicsError, setTopicsError] = useState<string | null>(null);
   const [filter, setFilter] = useState('');
+  const [activeCat, setActiveCat] = useState<string | null>(null);
   const [mode, setMode] = useState<AppMode>({ kind: 'list' });
   const [startError, setStartError] = useState<string | null>(null);
 
   useEffect(() => {
     listTopics()
-      .then((ts) => setTopics(ts))
+      .then((res) => {
+        setTopics(res.topics);
+        setCategories(res.categories);
+      })
       .catch((e) => setTopicsError(e instanceof Error ? e.message : String(e)));
   }, []);
 
+  const sideCategories = useMemo(
+    () => categories.filter((c) => c.depth === 1),
+    [categories],
+  );
+
+  const counts = useMemo(() => {
+    const map = new Map<string, number>();
+    if (!topics) return map;
+    for (const t of topics) {
+      if (t.parentId) {
+        map.set(t.parentId, (map.get(t.parentId) ?? 0) + 1);
+      }
+    }
+    return map;
+  }, [topics]);
+
+  const activeCategoryTitle = useMemo(() => {
+    if (!activeCat) return 'All topics';
+    const c = categories.find((x) => x.id === activeCat);
+    return c ? categoryLabel(c.title) : '';
+  }, [activeCat, categories]);
+
   const filtered = useMemo(() => {
     if (!topics) return [];
+    let list = topics;
+    if (activeCat) {
+      list = list.filter((t) => t.parentId === activeCat);
+    }
     const q = filter.trim().toLowerCase();
-    if (!q) return topics;
-    return topics.filter((t) => t.id.toLowerCase().includes(q) || t.title.toLowerCase().includes(q));
-  }, [topics, filter]);
+    if (q) {
+      list = list.filter(
+        (t) => t.id.toLowerCase().includes(q) || t.title.toLowerCase().includes(q),
+      );
+    }
+    return list;
+  }, [topics, activeCat, filter]);
 
   async function handleSelectTopic(topicId: string) {
     if (mode.kind === 'starting') return;
@@ -59,23 +105,43 @@ export default function App() {
   }
 
   return (
-    <div className="app">
-      <header className="masthead">
-        <div className="masthead-row">
-          <span className="eyebrow">MAFT · v0.1</span>
-          <span className="eyebrow">Schematic / 01</span>
-        </div>
-        <div className="masthead-body">
-          <h1 className="masthead-title">MAFT</h1>
-          <p className="masthead-lede">
-            <span className="masthead-fullname">Manifest Android Feynman Trainer</span>
-            <span className="masthead-sep">—</span>
+    <div className="app app-list">
+      <aside className="sidebar">
+        <div className="sidebar-brand">
+          <h1 className="brand-title">MAFT</h1>
+          <span className="eyebrow brand-meta">v0.1 · schematic</span>
+          <p className="brand-blurb">
             토픽을 자기 말로 풀어내며 코치의 소크라테스식 역질문으로 이해의 격차를 메우는 학습 도구.
           </p>
         </div>
-      </header>
 
-      <main className="main">
+        <nav className="sidebar-nav">
+          <span className="eyebrow nav-section-label">// categories</span>
+          <ul className="nav-list">
+            <li
+              className={`nav-item${activeCat === null ? ' is-active' : ''}`}
+              onClick={() => setActiveCat(null)}
+            >
+              <span className="nav-prefix">all</span>
+              <span className="nav-label">All topics</span>
+              <span className="nav-count">{topics?.length ?? 0}</span>
+            </li>
+            {sideCategories.map((c) => (
+              <li
+                key={c.id}
+                className={`nav-item${activeCat === c.id ? ' is-active' : ''}`}
+                onClick={() => setActiveCat(c.id)}
+              >
+                <span className="nav-prefix">{categoryPrefix(c.id)}</span>
+                <span className="nav-label">{categoryLabel(c.title)}</span>
+                <span className="nav-count">{counts.get(c.id) ?? 0}</span>
+              </li>
+            ))}
+          </ul>
+        </nav>
+      </aside>
+
+      <main className="main-area">
         {topicsError ? (
           <div className="status status-error">
             <span className="eyebrow status-tag">! Connection error</span>
@@ -88,17 +154,19 @@ export default function App() {
             <p>토픽 목록을 불러오는 중입니다…</p>
           </div>
         ) : (
-          <section className="index-view">
-            <div className="index-head">
+          <>
+            <div className="main-head">
               <span className="eyebrow">// table of contents</span>
-              <h2 className="index-title">학습할 토픽을 선택하세요.</h2>
-              <div className="index-meta">
-                <span className="index-count">
-                  <span className="index-count-num">{topics.length}</span>
-                  <span className="index-count-label">topics indexed</span>
+              <h2 className="main-title">{activeCategoryTitle}</h2>
+              <div className="main-meta">
+                <span className="main-count">
+                  <span className="count-num">{filtered.length}</span>
+                  <span className="count-label">
+                    {activeCat ? 'topics in this section' : 'topics indexed'}
+                  </span>
                 </span>
                 <input
-                  className="index-search"
+                  className="main-search"
                   placeholder="검색 — Context, Compose, Coroutine…"
                   value={filter}
                   onChange={(e) => setFilter(e.target.value)}
@@ -114,7 +182,11 @@ export default function App() {
             )}
 
             {filtered.length === 0 ? (
-              <p className="status">검색 결과가 없습니다.</p>
+              <p className="status">
+                {filter
+                  ? '검색 결과가 없습니다.'
+                  : '이 섹션에 학습 가능한 토픽이 없습니다.'}
+              </p>
             ) : (
               <ol className="index-list">
                 {filtered.map((t, i) => {
@@ -129,7 +201,9 @@ export default function App() {
                       <span className="row-num">{num}</span>
                       <span className="row-id">{shortId(t.id)}</span>
                       <span className="row-title">{t.title}</span>
-                      <span className="row-kind">{t.kind === 'extra' ? 'extra' : 'question'}</span>
+                      <span className="row-kind">
+                        {t.kind === 'extra' ? 'extra' : 'question'}
+                      </span>
                       <span className="row-arrow" aria-hidden="true">
                         {starting ? '…' : '→'}
                       </span>
@@ -138,7 +212,7 @@ export default function App() {
                 })}
               </ol>
             )}
-          </section>
+          </>
         )}
       </main>
     </div>

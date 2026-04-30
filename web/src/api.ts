@@ -8,6 +8,18 @@ export interface Topic {
   parentId: string | null;
 }
 
+export interface Category {
+  id: string;
+  title: string;
+  depth: number;
+  parentId: string | null;
+}
+
+export interface TopicsResponse {
+  topics: Topic[];
+  categories: Category[];
+}
+
 export interface Rubric {
   score: number;
   missedConcepts: string[];
@@ -54,9 +66,8 @@ async function fetchJson<T>(input: string, init?: RequestInit): Promise<T> {
   return res.json() as Promise<T>;
 }
 
-export async function listTopics(): Promise<Topic[]> {
-  const r = await fetchJson<{ topics: Topic[] }>('/api/topics');
-  return r.topics;
+export async function listTopics(): Promise<TopicsResponse> {
+  return fetchJson<TopicsResponse>('/api/topics');
 }
 
 export async function startSession(topicId: string): Promise<SessionStartResponse> {

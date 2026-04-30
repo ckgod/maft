@@ -15,7 +15,15 @@ export function createRouter(index: TopicIndex): Router {
       depth: t.depth,
       parentId: t.parentId,
     }));
-    res.json({ topics });
+    const categories = [...index.byId.values()]
+      .filter((n) => n.kind === 'category')
+      .map((c) => ({
+        id: c.id,
+        title: c.title,
+        depth: c.depth,
+        parentId: c.parentId,
+      }));
+    res.json({ topics, categories });
   };
 
   const startSession: RequestHandler = async (req, res) => {
