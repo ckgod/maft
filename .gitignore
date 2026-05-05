@@ -1,8 +1,10 @@
 node_modules/
 dist/
+dist-ssr/
 build/
 .DS_Store
 *.log
+*.local
 .env
 .env.local
 .env.*.local

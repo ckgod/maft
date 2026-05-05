@@ -28,7 +28,6 @@
 ![](docs/img/rubric.png)
 
 > 캡처는 `Q12-State-hoisting.md` 토픽으로 답변 3회를 진행해 mastered 도달까지 만든 시점입니다.
-> 재현하려면 두 dev 서버를 띄운 뒤 `cd scripts && npm install && npx playwright install chromium && npm run capture` 를 실행합니다 (Playwright 자동화).
 
 ## 학습 사이클
 
