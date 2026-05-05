@@ -131,15 +131,22 @@ erDiagram
   (`claude auth status` 의 `authMethod` 가 `claude.ai` 여야 합니다)
 - 인접 경로의 [ManifestAndroid](https://github.com/ckgod/ManifestAndroid) Writerside 컨텐츠가 필요합니다
 
-설치 · 실행:
+설치:
 
 ```bash
-# 1) 백엔드
-cd server && npm install && npm run dev      # http://localhost:3001
-
-# 2) 프론트엔드 (다른 터미널)
-cd web && npm install && npm run dev         # http://localhost:5173
+cd server && npm install
+cd ../web && npm install
 ```
+
+실행 (백그라운드 일괄):
+
+```bash
+./scripts/dev-up.sh    # 두 서버를 띄우고 헬스 체크까지 마친 뒤 반환
+./scripts/dev-down.sh  # 두 서버 종료
+# 로그: scripts/.run/server.log, scripts/.run/web.log
+```
+
+> 직접 한 터미널씩 띄우고 싶다면 `cd server && npm run dev` / `cd web && npm run dev` 도 그대로 됩니다.
 
 환경 변수:
 

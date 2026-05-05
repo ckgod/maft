@@ -15,3 +15,6 @@ coverage/
 # Local progress database (Phase 3)
 server/data/
 
+# Dev runner pidfiles + logs
+scripts/.run/
+
