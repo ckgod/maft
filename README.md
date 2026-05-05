@@ -5,13 +5,13 @@
 
 > 약칭 **MAFT** (Manifest Android Feynman Trainer).
 
-## 왜 만들었나
+## 기획 의도
 
 [skydoves/manifest-android-interview](https://github.com/skydoves/manifest-android-interview) 의 안드로이드 CS 토픽 약 109개를 그저 읽고 흘려보내는 대신,
-**파인만 학습 기법**(자기 설명 → 평가 → 빈틈 역질문 → 재학습) 을 인터랙티브로 구현해 이해도가 일정 수준에 도달할 때까지 가르쳐 주는 학습 도구.
+**파인만 학습 기법**(자기 설명 → 평가 → 빈틈 역질문 → 재학습) 을 인터랙티브로 구현해 이해도가 일정 수준에 도달할 때까지 가르쳐 주는 학습 도구입니다.
 
-학습자가 토픽을 자기 말로 풀어내면, AI 코치가 토픽 원문을 기준으로 채점하고 학습자가 빠뜨린 핵심 개념을 가리키는 역질문을 돌려준다.
-모든 점수와 누적 약점이 SQLite 에 영속화되어 어떤 토픽을 얼마나 깊이 이해했는지가 인덱스와 사이드바에 그대로 드러난다.
+학습자가 토픽을 자기 말로 풀어내면, AI 코치가 토픽 원문을 기준으로 채점하고 학습자가 빠뜨린 핵심 개념을 가리키는 역질문을 돌려줍니다.
+모든 점수와 누적 약점이 SQLite 에 영속화되므로, 어떤 토픽을 얼마나 깊이 이해했는지가 인덱스와 사이드바에 그대로 드러납니다.
 
 ## 화면
 
@@ -27,8 +27,8 @@
 
 ![](docs/img/rubric.png)
 
-> 캡처는 `Q12-State-hoisting.md` 토픽으로 답변 3회를 진행해 mastered 도달까지 만든 시점이다.
-> 재현은 두 dev 서버를 띄운 뒤 `cd scripts && npm install && npx playwright install chromium && npm run capture` 로 한다 (Playwright 자동화).
+> 캡처는 `Q12-State-hoisting.md` 토픽으로 답변 3회를 진행해 mastered 도달까지 만든 시점입니다.
+> 재현하려면 두 dev 서버를 띄운 뒤 `cd scripts && npm install && npx playwright install chromium && npm run capture` 를 실행합니다 (Playwright 자동화).
 
 ## 학습 사이클
 
@@ -120,16 +120,16 @@ erDiagram
   }
 ```
 
-토픽별 통계(베스트 점수 · 시도 횟수 · 마스터 여부)는 `sessions` 테이블 위의 집계 쿼리로 도출한다(별도 머터리얼라이즈 테이블 없음). 누적 약점은 평가 응답마다 `missed_concepts` 를 정규화(trim · lowercase) 후 `concept_misses` 에 UPSERT 한다.
+토픽별 통계(베스트 점수 · 시도 횟수 · 마스터 여부)는 `sessions` 테이블 위의 집계 쿼리로 도출합니다(별도 머터리얼라이즈 테이블 없음). 누적 약점은 평가 응답마다 `missed_concepts` 를 정규화(trim · lowercase) 후 `concept_misses` 에 UPSERT 합니다.
 
 ## 빠른 시작
 
 요구사항:
 
 - Node.js 20+
-- [Claude Code CLI](https://docs.claude.com/claude-code) 가 설치되어 있고 `claude.ai` 로그인이 완료되어 있을 것
-  (`claude auth status` 의 `authMethod` 가 `claude.ai` 여야 함)
-- 인접 경로의 [ManifestAndroid](https://github.com/ckgod/ManifestAndroid) Writerside 컨텐츠
+- [Claude Code CLI](https://docs.claude.com/claude-code) 가 설치되어 있고 `claude.ai` 로그인이 완료되어 있어야 합니다
+  (`claude auth status` 의 `authMethod` 가 `claude.ai` 여야 합니다)
+- 인접 경로의 [ManifestAndroid](https://github.com/ckgod/ManifestAndroid) Writerside 컨텐츠가 필요합니다
 
 설치 · 실행:
 
@@ -148,15 +148,15 @@ cd web && npm install && npm run dev         # http://localhost:5173
 | `MANIFEST_WRITERSIDE_DIR` | `../../ManifestAndroid/Writerside` | 토픽 콘텐츠 루트 |
 | `MAFT_DB_PATH` | `server/data/progress.db` | SQLite 진행 상황 DB |
 | `PORT` | `3001` | 서버 포트 |
-| `ANTHROPIC_API_KEY` | (미설정 권장) | 설정 시 OAuth 대신 API 키로 동작해 사용량 과금이 발생함. **MAFT 의 의도와 어긋나므로 unset 권장** |
+| `ANTHROPIC_API_KEY` | (미설정 권장) | 설정 시 OAuth 대신 API 키로 동작해 사용량 과금이 발생합니다. **MAFT 의 의도와 어긋나므로 unset 을 권장합니다** |
 
 ## 핵심 설계 결정
 
-- **Claude Code headless 로 LLM 호출** — `claude -p` 서브프로세스를 spawn 하고 `--output-format json` 을 파싱한다. `--bare` 옵션을 사용하지 않으면 OAuth(claude.ai 구독) 자격증명이 자동으로 적용되므로 별도 API 키 없이 구독 한도 내에서 동작한다.
-- **시스템 프롬프트의 JSON 채점 블록 강제** — 모든 평가 응답 끝에 `{score, missed_concepts, next_focus, mastered}` JSON 블록을 코드블록으로 첨부하도록 강제하고, 후속 메시지마다 형식 reminder 를 자동 첨부한다. 키 변형(`scores`, `missingConcepts` 등) 도 시스템 프롬프트에서 명시적으로 금지해 LLM 변동성을 흡수한다.
-- **점수 인플레이션 방지** — 같은 답변을 살짝 바꿔 재제출해도 새 정보가 없으면 점수가 오르지 않도록 시스템 프롬프트에 일관성 규칙을 두었다 (`score 2 → 2` 동결을 PoC 에서 확인).
-- **청자 재정의** — 일반적 파인만의 "12살 청자" 가정은 안드로이드 학습엔 부적합해 (Compose 가 무엇인지부터 풀어 설명할지 학습자가 혼란), **"이 토픽은 처음 듣지만 4대 컴포넌트 · Compose Composable/State · Kotlin 기초는 아는 동료 개발자"** 로 재정의했다.
-- **SQLite 영속화 + 누적 약점 트래킹** — 매 메시지마다 turns 테이블에 incremental insert 하고, `missed_concepts` 를 `concept_misses` 에 UPSERT 로 누적해 사이드바 Top N Weak Points 로 노출한다.
+- **Claude Code headless 로 LLM 호출** — `claude -p` 서브프로세스를 spawn 하고 `--output-format json` 을 파싱합니다. `--bare` 옵션을 사용하지 않으면 OAuth(claude.ai 구독) 자격증명이 자동으로 적용되므로 별도 API 키 없이 구독 한도 내에서 동작합니다.
+- **시스템 프롬프트의 JSON 채점 블록 강제** — 모든 평가 응답 끝에 `{score, missed_concepts, next_focus, mastered}` JSON 블록을 코드블록으로 첨부하도록 강제하고, 후속 메시지마다 형식 reminder 를 자동으로 첨부합니다. 키 변형(`scores`, `missingConcepts` 등) 도 시스템 프롬프트에서 명시적으로 금지해 LLM 변동성을 흡수합니다.
+- **점수 인플레이션 방지** — 같은 답변을 살짝 바꿔 재제출해도 새 정보가 없으면 점수가 오르지 않도록 시스템 프롬프트에 일관성 규칙을 두었습니다 (`score 2 → 2` 동결을 PoC 에서 확인했습니다).
+- **청자 재정의** — 일반적 파인만의 "12살 청자" 가정은 안드로이드 학습엔 부적합해 (Compose 가 무엇인지부터 풀어 설명할지 학습자가 혼란을 겪습니다), **"이 토픽은 처음 듣지만 4대 컴포넌트 · Compose Composable/State · Kotlin 기초는 아는 동료 개발자"** 로 재정의했습니다.
+- **SQLite 영속화 + 누적 약점 트래킹** — 매 메시지마다 turns 테이블에 incremental insert 하고, `missed_concepts` 를 `concept_misses` 에 UPSERT 로 누적해 사이드바 Top N Weak Points 로 노출합니다.
 
 ## 디렉토리
 
@@ -186,14 +186,14 @@ cd web && npm install && npm run dev         # http://localhost:5173
 
 ## 디자인 톤
 
-차분한 학습 환경을 의도해 **Schematic Dark** 톤으로 정리했다. Geist + Pretendard Variable, paper `#0e1014`, 강조색 blueprint `#6b9ddb`, 점수 팔레트 (moss / amber / sienna / slate). 게임화는 인플레이션을 피하고자 차분한 배지 (`best 3/5 · ×2`, `★ mastered`) 와 작은 sparkline 막대만으로 한다.
+차분한 학습 환경을 의도해 **Schematic Dark** 톤으로 정리했습니다. Geist + Pretendard Variable, paper `#0e1014`, 강조색 blueprint `#6b9ddb`, 점수 팔레트 (moss / amber / sienna / slate) 로 구성되어 있습니다. 게임화는 인플레이션을 피하고자 차분한 배지 (`best 3/5 · ×2`, `★ mastered`) 와 작은 sparkline 막대만으로 한정합니다.
 
 ## 한계 / 다음 단계
 
-- **응답 스트리밍 미적용** — 첫 문자 도착까지 수 초 대기 (`--output-format stream-json` 으로 SSE 도입 예정)
-- **Weak Points 정규화는 단순 trim/lowercase** — "recomposition 트리거" / "리컴포지션 발생 조건" 이 별개 항목으로 누적될 수 있음
-- **테스트 미작성** — Phase 5 에서 핵심 경로(JSON 추출, 채점 일관성) 위주로 추가 예정
+- **응답 스트리밍 미적용** — 첫 문자 도착까지 수 초가 걸립니다 (`--output-format stream-json` 으로 SSE 도입 예정입니다).
+- **Weak Points 정규화는 단순 trim/lowercase** — "recomposition 트리거" / "리컴포지션 발생 조건" 이 별개 항목으로 누적될 수 있습니다.
+- **테스트 미작성** — Phase 5 에서 핵심 경로(JSON 추출, 채점 일관성) 위주로 추가할 예정입니다.
 
 ## 라이선스 / 출처
 
-학습 콘텐츠 원본 저작권은 [skydoves/manifest-android-interview](https://github.com/skydoves/manifest-android-interview) 에 있다 (Apache 2.0). 본 도구는 콘텐츠를 동봉하지 않으며 인접 디렉토리의 Writerside 파일을 읽어 사용한다.
+학습 콘텐츠 원본 저작권은 [skydoves/manifest-android-interview](https://github.com/skydoves/manifest-android-interview) 에 있습니다 (Apache 2.0). 본 도구는 콘텐츠를 동봉하지 않고, 인접 디렉토리의 Writerside 파일을 읽어 사용합니다.
