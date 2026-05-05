@@ -15,7 +15,20 @@
 
 ## 화면
 
-> 캡처 예정 (목록 인덱스 · 학습 세션 · 점수 패널).
+토픽 인덱스 (사이드바에 누적 약점)
+
+![](docs/img/index.png)
+
+학습 세션 — 점수 패널과 Recurring Gaps, 코치의 마스터 안내
+
+![](docs/img/session.png)
+
+점수 패널 단독 — turns / latest / average / best + sparkline + recurring gaps
+
+![](docs/img/rubric.png)
+
+> 캡처는 `Q12-State-hoisting.md` 토픽으로 답변 3회를 진행해 mastered 도달까지 만든 시점이다.
+> 재현은 두 dev 서버를 띄운 뒤 `cd scripts && npm install && npx playwright install chromium && npm run capture` 로 한다 (Playwright 자동화).
 
 ## 학습 사이클
 
