@@ -72,7 +72,8 @@ export function SessionView({ initial, onExit }: SessionViewProps) {
   const [panelOpen, setPanelOpen] = useState(false);
   const scrollRef = useRef<HTMLDivElement>(null);
 
-  const isResuming = !!(activeInitial.turns && activeInitial.turns.length > 1);
+  const isResuming =
+    !restarting && !!(activeInitial.turns && activeInitial.turns.length > 1);
 
   useEffect(() => {
     const mq = window.matchMedia(NARROW_QUERY);
@@ -115,6 +116,9 @@ export function SessionView({ initial, onExit }: SessionViewProps) {
     if (!ok) return;
     setError(null);
     setRestarting(true);
+    // claude spawn 이 10~30s 걸리므로 thread 영역을 즉시 비워 시작 신호를 명확히 만듭니다.
+    setMessages([]);
+    setMastered(false);
     try {
       const fresh = await startSession(activeInitial.topicId);
       setActiveInitial(fresh);
@@ -169,6 +173,21 @@ export function SessionView({ initial, onExit }: SessionViewProps) {
       />
 
       <div className="thread" ref={scrollRef}>
+        {restarting && (
+          <article className="entry entry-coach entry-restart">
+            <span className="eyebrow entry-tag">Coach · 새 세션 준비 중</span>
+            <div className="entry-body">
+              <p className="typing">
+                새 세션을 시작하는 중입니다. claude 와의 첫 인사가 도착할 때까지 10~30초 정도 걸릴 수 있습니다.
+              </p>
+              <span className="row-loading" aria-label="시작 중">
+                <span />
+                <span />
+                <span />
+              </span>
+            </div>
+          </article>
+        )}
         {messages.map((m, i) => {
           if (m.role === 'user') {
             userTurn += 1;
@@ -246,9 +265,12 @@ export function SessionView({ initial, onExit }: SessionViewProps) {
               void handleSend();
             }
           }}
-          disabled={sending}
+          disabled={sending || restarting}
         />
-        <button onClick={() => void handleSend()} disabled={sending || !input.trim()}>
+        <button
+          onClick={() => void handleSend()}
+          disabled={sending || restarting || !input.trim()}
+        >
           {sending ? 'Sending' : 'Submit'}
         </button>
       </div>

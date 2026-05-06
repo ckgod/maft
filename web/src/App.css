@@ -835,6 +835,47 @@
   color: var(--ink-3);
 }
 
+/* "새 세션" 시작 중 thread placeholder. evaluating pending 보다 더 명확한 신호 */
+.entry-restart .entry-body {
+  border-style: dashed;
+  border-left-color: var(--amber);
+  position: relative;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.entry-restart .entry-body::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(
+    90deg,
+    transparent 0%,
+    rgba(245, 191, 132, 0.10) 50%,
+    transparent 100%
+  );
+  background-size: 200% 100%;
+  animation: shimmer 1.6s linear infinite;
+  pointer-events: none;
+}
+
+.entry-restart .entry-tag {
+  color: var(--amber);
+}
+
+.entry-restart .row-loading {
+  width: auto;
+  gap: 6px;
+}
+
+.entry-restart .row-loading span {
+  width: 6px;
+  height: 6px;
+  background: var(--amber);
+}
+
 /* Errata = missed concepts */
 
 .errata {
