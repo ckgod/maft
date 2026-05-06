@@ -123,29 +123,35 @@ erDiagram
 
 ## 빠른 시작
 
-요구사항:
+사전 요구사항:
 
-- Node.js 20+
-- [Claude Code CLI](https://docs.claude.com/claude-code) 가 설치되어 있고 `claude.ai` 로그인이 완료되어 있어야 합니다
+- **Node.js 20+**
+- **[Claude Code CLI](https://docs.claude.com/claude-code)** 가 설치되어 있고 `claude.ai` 로그인이 완료되어 있어야 합니다
   (`claude auth status` 의 `authMethod` 가 `claude.ai` 여야 합니다)
-- 인접 경로의 [ManifestAndroid](https://github.com/ckgod/ManifestAndroid) Writerside 컨텐츠가 필요합니다
-
-설치:
 
 ```bash
-cd server && npm install
-cd ../web && npm install
+git clone git@github.com:ckgod/maft.git
+cd maft
+./scripts/install.sh   # 의존성 점검 → Writerside 콘텐츠 clone → npm install
+./scripts/dev-up.sh    # 두 dev 서버 백그라운드 시작 + 헬스체크
+open http://localhost:5173
 ```
 
-실행 (백그라운드 일괄):
+종료할 때:
 
 ```bash
-./scripts/dev-up.sh    # 두 서버를 띄우고 헬스 체크까지 마친 뒤 반환
 ./scripts/dev-down.sh  # 두 서버 종료
-# 로그: scripts/.run/server.log, scripts/.run/web.log
+# 로그는 scripts/.run/server.log · scripts/.run/web.log 에 남습니다
 ```
 
-> 직접 한 터미널씩 띄우고 싶다면 `cd server && npm run dev` / `cd web && npm run dev` 도 그대로 됩니다.
+`install.sh` 가 하는 일:
+
+1. node / npm / git / claude CLI 가 PATH 에 있는지, Node 가 20+ 인지 확인
+2. Claude OAuth 인증 상태(`authMethod: claude.ai`) 확인
+3. `../ManifestAndroid` 가 없으면 [ckgod/ManifestAndroid](https://github.com/ckgod/ManifestAndroid) 를 얕게 clone (`MAFT_WRITERSIDE_REPO` / `MANIFEST_WRITERSIDE_DIR` 로 override 가능)
+4. `server` · `web` 의존성 설치
+
+> 한 터미널씩 직접 띄우고 싶다면 `cd server && npm run dev` / `cd web && npm run dev` 도 그대로 동작합니다.
 
 환경 변수:
 
