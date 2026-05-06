@@ -39,6 +39,13 @@ function pad2(n: number): string {
   return String(n).padStart(2, '0');
 }
 
+const NARROW_QUERY = '(max-width: 920px)';
+
+function readInitialNarrow(): boolean {
+  if (typeof window === 'undefined') return false;
+  return window.matchMedia(NARROW_QUERY).matches;
+}
+
 export function SessionView({ initial, onExit }: SessionViewProps) {
   const [messages, setMessages] = useState<Message[]>([
     { role: 'assistant', text: initial.message, rubric: initial.rubric },
@@ -47,7 +54,16 @@ export function SessionView({ initial, onExit }: SessionViewProps) {
   const [sending, setSending] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [mastered, setMastered] = useState(initial.mastered);
+  const [isNarrow, setIsNarrow] = useState<boolean>(readInitialNarrow);
+  const [panelOpen, setPanelOpen] = useState(false);
   const scrollRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    const mq = window.matchMedia(NARROW_QUERY);
+    const handler = (e: MediaQueryListEvent) => setIsNarrow(e.matches);
+    mq.addEventListener('change', handler);
+    return () => mq.removeEventListener('change', handler);
+  }, []);
 
   useEffect(() => {
     const el = scrollRef.current;
@@ -95,7 +111,12 @@ export function SessionView({ initial, onExit }: SessionViewProps) {
         )}
       </header>
 
-      <ScorePanel messages={messages} />
+      <ScorePanel
+        messages={messages}
+        collapsible={isNarrow}
+        open={panelOpen}
+        onToggle={() => setPanelOpen((o) => !o)}
+      />
 
       <div className="thread" ref={scrollRef}>
         {messages.map((m, i) => {

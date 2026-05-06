@@ -909,9 +909,75 @@
   align-items: baseline;
 }
 
+.rubric-head-actions {
+  display: inline-flex;
+  align-items: baseline;
+  gap: 12px;
+}
+
 .rubric-head-meta {
   font-family: var(--font-mono);
   letter-spacing: 0.16em;
+}
+
+.rubric-toggle {
+  background: transparent;
+  border: 1px solid var(--rule);
+  color: var(--ink-3);
+  font-family: var(--font-mono);
+  font-size: var(--tt-xs);
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  padding: 3px 9px;
+  cursor: pointer;
+  transition:
+    color 0.16s var(--ease-out),
+    border-color 0.16s var(--ease-out);
+}
+
+.rubric-toggle:hover {
+  color: var(--blueprint);
+  border-color: var(--blueprint);
+}
+
+/* Compact summary row used while panel is collapsed on narrow viewports */
+
+.rubric-summary {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px 18px;
+  padding-top: 4px;
+}
+
+.rubric-summary-item {
+  display: inline-flex;
+  align-items: baseline;
+  gap: 6px;
+  font-family: var(--font-mono);
+  font-size: var(--tt-xs);
+  color: var(--ink-3);
+  letter-spacing: 0.06em;
+}
+
+.rubric-summary-label {
+  text-transform: uppercase;
+  letter-spacing: 0.12em;
+  color: var(--ink-4);
+}
+
+.rubric-summary-item b {
+  font-family: var(--font-display);
+  font-weight: 600;
+  font-size: var(--tt-m);
+  color: var(--ink);
+  letter-spacing: -0.01em;
+  font-variant-numeric: tabular-nums;
+  line-height: 1;
+}
+
+.rubric-figure.is-collapsed {
+  gap: 8px;
+  padding: 12px 18px 12px;
 }
 
 .rubric-grid {
@@ -1143,8 +1209,32 @@
     grid-template-columns: 28px 1fr auto 14px;
     gap: 12px;
   }
-  .index-row .row-id,
-  .index-row .row-kind {
+  .index-row .row-id {
     display: none;
+  }
+  /* keep .row-kind visible — master/best/attempts 표시는 좁은 화면에서도 필요 */
+  .index-row .row-kind {
+    font-size: var(--tt-xs);
+    letter-spacing: 0.06em;
+    padding-left: 6px;
+    max-width: 96px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+
+  /* Session view — 노트북에서 thread 공간 확보 */
+  .app-session {
+    padding: 20px 20px 24px;
+  }
+  .session-head {
+    grid-template-columns: auto 1fr auto;
+    gap: 14px;
+    padding-bottom: 12px;
+  }
+  .session-h2 {
+    font-size: var(--tt-l);
+  }
+  .composer textarea {
+    min-height: 56px;
   }
 }

@@ -4,6 +4,11 @@ import { colorForScore } from './ScoreBadge';
 
 interface ScorePanelProps {
   messages: Message[];
+  /** 좁은 viewport 에서 사용자가 접기/펼치기를 제어할 수 있는 모드 */
+  collapsible?: boolean;
+  /** collapsible=true 일 때 펼침 여부 (기본 접힘) */
+  open?: boolean;
+  onToggle?: () => void;
 }
 
 interface Stats {
@@ -49,20 +54,73 @@ function trendIndicator(scores: number[]): string {
   return '→';
 }
 
-export function ScorePanel({ messages }: ScorePanelProps) {
+export function ScorePanel({
+  messages,
+  collapsible = false,
+  open = true,
+  onToggle,
+}: ScorePanelProps) {
   const stats = useMemo(() => computeStats(messages), [messages]);
 
   if (stats.turns === 0) return null;
 
+  const collapsedNow = collapsible && !open;
+
   return (
-    <aside className="rubric-figure">
+    <aside className={`rubric-figure${collapsedNow ? ' is-collapsed' : ''}`}>
       <div className="rubric-head">
         <span className="eyebrow">Figure 01 · Rubric</span>
-        <span className="eyebrow rubric-head-meta">
-          n = {String(stats.turns).padStart(2, '0')}
-        </span>
+        <div className="rubric-head-actions">
+          <span className="eyebrow rubric-head-meta">
+            n = {String(stats.turns).padStart(2, '0')}
+          </span>
+          {collapsible && (
+            <button
+              type="button"
+              className="rubric-toggle"
+              onClick={onToggle}
+              aria-expanded={open}
+            >
+              {open ? '접기' : '펼치기'}
+            </button>
+          )}
+        </div>
       </div>
 
+      {collapsedNow && (
+        <div className="rubric-summary" role="group" aria-label="점수 요약">
+          <span className="rubric-summary-item">
+            <span className="rubric-summary-label">latest</span>
+            <b style={{ color: colorForScore(stats.latest) }}>
+              {stats.latest}
+              <span className="stat-trend">{trendIndicator(stats.scores)}</span>
+            </b>
+          </span>
+          <span className="rubric-summary-item">
+            <span className="rubric-summary-label">avg</span>
+            <b style={{ color: colorForScore(Math.round(stats.avg)) }}>
+              {stats.avg.toFixed(1)}
+            </b>
+          </span>
+          <span className="rubric-summary-item">
+            <span className="rubric-summary-label">best</span>
+            <b style={{ color: colorForScore(stats.best) }}>{stats.best}</b>
+          </span>
+          <span className="rubric-summary-item">
+            <span className="rubric-summary-label">turns</span>
+            <b>{stats.turns}</b>
+          </span>
+          {stats.topMissed.length > 0 && (
+            <span className="rubric-summary-item rubric-summary-gaps">
+              <span className="rubric-summary-label">gaps</span>
+              <b>{stats.topMissed.length}</b>
+            </span>
+          )}
+        </div>
+      )}
+
+      {!collapsedNow && (
+      <>
       <div className="rubric-grid">
         <div className="rubric-stat">
           <span className="stat-label">Turns</span>
@@ -124,6 +182,8 @@ export function ScorePanel({ messages }: ScorePanelProps) {
             ))}
           </ul>
         </div>
+      )}
+      </>
       )}
     </aside>
   );
