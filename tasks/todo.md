@@ -14,7 +14,11 @@
   - `ScorePanel` 에 `collapsible/open/onToggle` props 추가, narrow 시 기본 접힘
   - 접힌 상태: `latest · avg · best · turns · gaps` 1줄 summary + 펼치기 토글
   - desktop (≥920px) 은 항상 풀펼침 — 회귀 없음
-- [ ] **0.3** 세션을 클릭할 때마다 클로드 cli 실행하는 것으로 보임. 이미 학습한 내용일 때 클릭하면 이전 학습 대화 내용이 보여지고, 재시작 가능하게 수정했으면 좋겠음. 클로드 세션은 유지할 필요는 없으나. 학습 기록이 이미 있는 경우에 인풋을 넣었을 시 이전 채팅 기록들도 같이 인풋으로 넣어서 어느정도 context 유지에 도움되게 수정.
+- [x] **0.3** 세션을 클릭할 때마다 클로드 cli 실행하는 것으로 보임. 이미 학습한 내용일 때 클릭하면 이전 학습 대화 내용이 보여지고, 재시작 가능하게 수정했으면 좋겠음. 클로드 세션은 유지할 필요는 없으나. 학습 기록이 이미 있는 경우에 인풋을 넣었을 시 이전 채팅 기록들도 같이 인풋으로 넣어서 어느정도 context 유지에 도움되게 수정.
+  - 서버: `GET /api/topics/:id/last-session` 추가 — 토픽의 가장 최근 세션을 hydration 형태로 반환 (mastered 무관)
+  - 서버: `postMessage` 가 더 이상 `--resume sessionId` 를 사용하지 않고 매번 새 claude spawn. 시스템 프롬프트 뒤에 "이전 학습 맥락" preamble (마지막 3 turn 발췌 + 누적 약점 top 5) 동봉
+  - 클라이언트: 토픽 클릭 시 last-session 우선 hydration → 없으면 새로 시작. 세션 헤더에 `resumed` 태그 + `새 세션` 버튼
+  - 검증: Q1 resume (3 turn 복원), Q12-State mastered resume (7 turn + Mastered pill), 새 세션 버튼 → fresh, 메시지 제출 응답이 "이전 안내에서 말씀드렸듯이…" 로 이어가는 것 확인
 
 ---
 

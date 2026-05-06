@@ -2,8 +2,10 @@ import { useEffect, useRef, useState } from 'react';
 import ReactMarkdown from 'react-markdown';
 import {
   sendMessage,
+  startSession,
   type Rubric,
   type SessionStartResponse,
+  type SessionTurn,
 } from './api';
 import { ScoreBadge } from './ScoreBadge';
 import { ScorePanel } from './ScorePanel';
@@ -17,6 +19,17 @@ export interface Message {
 interface SessionViewProps {
   initial: SessionStartResponse;
   onExit: () => void;
+}
+
+function turnsToMessages(turns: SessionTurn[]): Message[] {
+  return turns.map((t) => ({ role: t.role, text: t.text, rubric: t.rubric }));
+}
+
+function buildInitialMessages(initial: SessionStartResponse): Message[] {
+  if (initial.turns && initial.turns.length > 0) {
+    return turnsToMessages(initial.turns);
+  }
+  return [{ role: 'assistant', text: initial.message, rubric: initial.rubric }];
 }
 
 const RUBRIC_BLOCK_RE = /```json\s*[\s\S]*?\s*```\s*$/m;
@@ -47,16 +60,19 @@ function readInitialNarrow(): boolean {
 }
 
 export function SessionView({ initial, onExit }: SessionViewProps) {
-  const [messages, setMessages] = useState<Message[]>([
-    { role: 'assistant', text: initial.message, rubric: initial.rubric },
-  ]);
+  // initial.turns 가 채워져 있으면 hydration, 없으면 opening 메시지만으로 시작.
+  const [activeInitial, setActiveInitial] = useState<SessionStartResponse>(initial);
+  const [messages, setMessages] = useState<Message[]>(() => buildInitialMessages(initial));
   const [input, setInput] = useState('');
   const [sending, setSending] = useState(false);
+  const [restarting, setRestarting] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [mastered, setMastered] = useState(initial.mastered);
   const [isNarrow, setIsNarrow] = useState<boolean>(readInitialNarrow);
   const [panelOpen, setPanelOpen] = useState(false);
   const scrollRef = useRef<HTMLDivElement>(null);
+
+  const isResuming = !!(activeInitial.turns && activeInitial.turns.length > 1);
 
   useEffect(() => {
     const mq = window.matchMedia(NARROW_QUERY);
@@ -78,7 +94,7 @@ export function SessionView({ initial, onExit }: SessionViewProps) {
     setMessages((prev) => [...prev, { role: 'user', text, rubric: null }]);
     setInput('');
     try {
-      const res = await sendMessage(initial.sessionId, text);
+      const res = await sendMessage(activeInitial.sessionId, text);
       setMessages((prev) => [
         ...prev,
         { role: 'assistant', text: res.message, rubric: res.rubric },
@@ -88,6 +104,26 @@ export function SessionView({ initial, onExit }: SessionViewProps) {
       setError(e instanceof Error ? e.message : String(e));
     } finally {
       setSending(false);
+    }
+  }
+
+  async function handleRestart() {
+    if (restarting || sending) return;
+    const ok = window.confirm(
+      '새 세션을 시작합니다. 이전 대화 기록은 보존되지만 토픽 클릭 시에는 새 세션이 최신으로 노출됩니다. 계속하시겠습니까?',
+    );
+    if (!ok) return;
+    setError(null);
+    setRestarting(true);
+    try {
+      const fresh = await startSession(activeInitial.topicId);
+      setActiveInitial(fresh);
+      setMessages(buildInitialMessages(fresh));
+      setMastered(fresh.mastered);
+    } catch (e) {
+      setError(e instanceof Error ? e.message : String(e));
+    } finally {
+      setRestarting(false);
     }
   }
 
@@ -101,14 +137,28 @@ export function SessionView({ initial, onExit }: SessionViewProps) {
           ← Index
         </button>
         <div className="session-meta">
-          <span className="eyebrow">Topic · {topicNumber(initial.topicId)}</span>
-          <h2 className="session-h2">{initial.topicTitle}</h2>
+          <span className="eyebrow">
+            Topic · {topicNumber(activeInitial.topicId)}
+            {isResuming && <span className="session-resume-tag"> · resumed</span>}
+          </span>
+          <h2 className="session-h2">{activeInitial.topicTitle}</h2>
         </div>
-        {mastered ? (
-          <span className="mastered-pill">Mastered</span>
-        ) : (
-          <span className="eyebrow session-state">In session</span>
-        )}
+        <div className="session-actions">
+          {mastered ? (
+            <span className="mastered-pill">Mastered</span>
+          ) : (
+            <span className="eyebrow session-state">In session</span>
+          )}
+          <button
+            type="button"
+            className="link-restart"
+            onClick={() => void handleRestart()}
+            disabled={restarting || sending}
+            title="이 토픽을 새 세션으로 다시 시작합니다"
+          >
+            {restarting ? 'starting…' : '새 세션'}
+          </button>
+        </div>
       </header>
 
       <ScorePanel

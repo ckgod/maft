@@ -49,6 +49,8 @@ export interface SessionStartResponse {
   message: string;
   rubric: Rubric | null;
   mastered: boolean;
+  /** 재개일 때만 채워집니다 (opening 메시지 포함 누적 turn). */
+  turns?: SessionTurn[];
 }
 
 export interface SessionMessageResponse {
@@ -99,6 +101,23 @@ export async function startSession(topicId: string): Promise<SessionStartRespons
     method: 'POST',
     body: JSON.stringify({ topicId }),
   });
+}
+
+/**
+ * 해당 토픽의 직전 세션을 가져옵니다. 없으면 null 을 돌려줍니다 (404 를 정상 흐름으로 흡수).
+ */
+export async function getLastSessionForTopic(
+  topicId: string,
+): Promise<SessionStartResponse | null> {
+  const res = await fetch(`/api/topics/${encodeURIComponent(topicId)}/last-session`, {
+    headers: { 'Content-Type': 'application/json' },
+  });
+  if (res.status === 404) return null;
+  if (!res.ok) {
+    const text = await res.text().catch(() => '');
+    throw new Error(`${res.status} ${res.statusText}${text ? `: ${text}` : ''}`);
+  }
+  return res.json() as Promise<SessionStartResponse>;
 }
 
 export async function sendMessage(

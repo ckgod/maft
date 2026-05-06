@@ -68,6 +68,10 @@ const selectTurnsStmt = db.prepare(
 
 const listSessionsStmt = db.prepare(`SELECT * FROM sessions ORDER BY created_at DESC`);
 
+const latestSessionByTopicStmt = db.prepare(
+  `SELECT * FROM sessions WHERE topic_id = ? ORDER BY updated_at DESC, created_at DESC LIMIT 1`,
+);
+
 function rubricFromColumns(
   score: number | null,
   missedJson: string | null,
@@ -119,6 +123,12 @@ export function getSession(id: string): Session | undefined {
 export function listSessions(): Session[] {
   const rows = listSessionsStmt.all() as SessionRow[];
   return rows.map(rowToSession);
+}
+
+export function getLatestSessionByTopic(topicId: string): Session | undefined {
+  const row = latestSessionByTopicStmt.get(topicId) as SessionRow | undefined;
+  if (!row) return undefined;
+  return rowToSession(row);
 }
 
 export interface NewSessionParams {

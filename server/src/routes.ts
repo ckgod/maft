@@ -1,15 +1,26 @@
 import { Router, type RequestHandler } from 'express';
 import { callClaude } from './claude.js';
-import { buildSystemPrompt, withFormatReminder, extractRubric } from './prompt.js';
+import {
+  buildSystemPrompt,
+  buildContextPreamble,
+  withFormatReminder,
+  extractRubric,
+} from './prompt.js';
 import type { TopicIndex } from './topics.js';
 import {
   appendTurn,
   createSession,
+  getLatestSessionByTopic,
   getSession,
   listSessions,
   updateSessionMeta,
 } from './sessions.js';
-import { getTopicStatsMap, getWeakPoints, recordMissedConcepts } from './stats.js';
+import {
+  getMissedConceptsForTopic,
+  getTopicStatsMap,
+  getWeakPoints,
+  recordMissedConcepts,
+} from './stats.js';
 
 export function createRouter(index: TopicIndex): Router {
   const router = Router();
@@ -99,10 +110,26 @@ export function createRouter(index: TopicIndex): Router {
       return;
     }
 
+    const topic = index.byId.get(session.topicId);
+    if (!topic) {
+      res.status(500).json({ error: 'topic for session not found', topicId: session.topicId });
+      return;
+    }
+
     try {
+      // claude 백엔드 세션 영속성에 의존하지 않고, 매번 새 spawn 으로 호출합니다.
+      // 직전 학습 맥락(마지막 N turn + 누적 약점)은 시스템 프롬프트 뒤에 동봉합니다.
+      const baseSystem = buildSystemPrompt(topic);
+      const preamble = buildContextPreamble(
+        session.history.map((t) => ({ role: t.role, text: t.text })),
+        getMissedConceptsForTopic(session.topicId, 5).map((m) => ({
+          concept: m.concept,
+          count: m.count,
+        })),
+      );
       const result = await callClaude({
         prompt: withFormatReminder(userMessage),
-        sessionId: session.id,
+        systemPrompt: baseSystem + preamble,
       });
       const rubric = extractRubric(result.text);
       const ts = Date.now();
@@ -150,6 +177,38 @@ export function createRouter(index: TopicIndex): Router {
     res.json(session);
   };
 
+  /**
+   * 토픽의 가장 최근 세션을 hydration 형태(SessionStartResponse + turns) 로 반환합니다.
+   * 클라이언트는 이 응답을 받아 화면을 복원합니다. 직전 세션이 없으면 404.
+   */
+  const getLastSessionForTopic: RequestHandler = (req, res) => {
+    const topicId = req.params.topicId;
+    if (typeof topicId !== 'string' || !topicId) {
+      res.status(400).json({ error: 'topicId is required' });
+      return;
+    }
+    const topic = index.byId.get(topicId);
+    if (!topic) {
+      res.status(404).json({ error: 'topic not found', topicId });
+      return;
+    }
+    const session = getLatestSessionByTopic(topicId);
+    if (!session) {
+      res.status(404).json({ error: 'no session for topic', topicId });
+      return;
+    }
+    const opening = session.history[0];
+    res.json({
+      sessionId: session.id,
+      topicId: session.topicId,
+      topicTitle: topic.title,
+      message: opening?.text ?? '',
+      rubric: opening?.rubric ?? null,
+      mastered: session.mastered,
+      turns: session.history,
+    });
+  };
+
   const listAllSessions: RequestHandler = (_req, res) => {
     res.json({ sessions: listSessions() });
   };
@@ -176,6 +235,7 @@ export function createRouter(index: TopicIndex): Router {
   };
 
   router.get('/topics', getTopics);
+  router.get('/topics/:topicId/last-session', getLastSessionForTopic);
   router.post('/sessions', startSession);
   router.get('/sessions', listAllSessions);
   router.get('/weak-points', listWeakPoints);

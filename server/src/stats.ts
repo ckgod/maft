@@ -113,3 +113,24 @@ export function getWeakPoints(limit = 10): WeakPointRow[] {
     lastSeenAt: r.last_seen_at,
   }));
 }
+
+const topicMissedConceptsStmt = db.prepare(
+  `SELECT topic_id, concept, count, last_seen_at
+   FROM concept_misses
+   WHERE topic_id = ?
+   ORDER BY count DESC, last_seen_at DESC
+   LIMIT ?`,
+);
+
+export function getMissedConceptsForTopic(
+  topicId: string,
+  limit = 5,
+): WeakPointRow[] {
+  const rows = topicMissedConceptsStmt.all(topicId, limit) as WeakPointSqlRow[];
+  return rows.map((r) => ({
+    topicId: r.topic_id,
+    concept: r.concept,
+    count: r.count,
+    lastSeenAt: r.last_seen_at,
+  }));
+}

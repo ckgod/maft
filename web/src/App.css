@@ -623,7 +623,6 @@
 }
 
 .mastered-pill {
-  align-self: end;
   font-family: var(--font-mono);
   font-size: var(--tt-xs);
   letter-spacing: 0.16em;
@@ -635,7 +634,45 @@
 }
 
 .session-state {
+  align-self: center;
+}
+
+.session-actions {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
   align-self: end;
+}
+
+.link-restart {
+  background: transparent;
+  border: 1px solid var(--rule);
+  padding: 6px 12px;
+  color: var(--ink-3);
+  font-family: var(--font-mono);
+  font-size: var(--tt-xs);
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  cursor: pointer;
+  transition:
+    color 0.16s var(--ease-out),
+    border-color 0.16s var(--ease-out),
+    background 0.16s var(--ease-out);
+}
+
+.link-restart:hover:not(:disabled) {
+  color: var(--amber);
+  border-color: var(--amber);
+}
+
+.link-restart:disabled {
+  opacity: 0.4;
+  cursor: wait;
+}
+
+.session-resume-tag {
+  color: var(--blueprint);
+  letter-spacing: 0.14em;
 }
 
 /* ---- Thread (messages) ---- */

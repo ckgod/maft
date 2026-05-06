@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState } from 'react';
 import {
+  getLastSessionForTopic,
   listTopics,
   listWeakPoints,
   startSession,
@@ -120,6 +121,12 @@ export default function App() {
     setStartError(null);
     setMode({ kind: 'starting', topicId });
     try {
+      // 직전 세션이 있으면 mastered 여부와 무관하게 그대로 이어갑니다.
+      const resumed = await getLastSessionForTopic(topicId);
+      if (resumed) {
+        setMode({ kind: 'session', data: resumed });
+        return;
+      }
       const data = await startSession(topicId);
       setMode({ kind: 'session', data });
     } catch (e) {
