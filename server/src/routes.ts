@@ -1,12 +1,7 @@
 import { Router, type RequestHandler } from 'express';
 import { callClaude } from './claude.js';
 import { db } from './db.js';
-import {
-  buildSystemPrompt,
-  buildContextPreamble,
-  withFormatReminder,
-  extractRubric,
-} from './prompt.js';
+import { buildSystemPrompt, withFormatReminder, extractRubric } from './prompt.js';
 import type { TopicIndex } from './topics.js';
 import {
   appendTurn,
@@ -15,11 +10,11 @@ import {
   getLatestSessionByTopic,
   getSession,
   listSessions,
+  updateClaudeSessionId,
   updateSessionMeta,
 } from './sessions.js';
 import {
   deleteConceptMissesForTopic,
-  getMissedConceptsForTopic,
   getTopicStatsMap,
   getWeakPoints,
   recordMissedConcepts,
@@ -80,6 +75,7 @@ export function createRouter(index: TopicIndex): Router {
         topicId: topic.id,
         createdAt: Date.now(),
         initialAssistantText: result.text,
+        claudeSessionId: result.sessionId,
       });
 
       res.json({
@@ -113,27 +109,22 @@ export function createRouter(index: TopicIndex): Router {
       return;
     }
 
-    const topic = index.byId.get(session.topicId);
-    if (!topic) {
+    if (!index.byId.has(session.topicId)) {
       res.status(500).json({ error: 'topic for session not found', topicId: session.topicId });
       return;
     }
 
     try {
-      // claude 백엔드 세션 영속성에 의존하지 않고, 매번 새 spawn 으로 호출합니다.
-      // 직전 학습 맥락(마지막 N turn + 누적 약점)은 시스템 프롬프트 뒤에 동봉합니다.
-      const baseSystem = buildSystemPrompt(topic);
-      const preamble = buildContextPreamble(
-        session.history.map((t) => ({ role: t.role, text: t.text })),
-        getMissedConceptsForTopic(session.topicId, 5).map((m) => ({
-          concept: m.concept,
-          count: m.count,
-        })),
-      );
+      // claude CLI 의 세션 영속성을 사용합니다 (`--resume`).
+      // 시스템 프롬프트와 history 는 claude 측이 들고 있으므로 우리는 새 user 메시지만 보냅니다.
       const result = await callClaude({
         prompt: withFormatReminder(userMessage),
-        systemPrompt: baseSystem + preamble,
+        sessionId: session.claudeSessionId,
       });
+      if (result.sessionId && result.sessionId !== session.claudeSessionId) {
+        // claude 가 새 ID 를 돌려준 경우(예: fork) 우리 DB 의 매핑을 동기화합니다.
+        updateClaudeSessionId(session.id, result.sessionId);
+      }
       const rubric = extractRubric(result.text);
       const ts = Date.now();
       appendTurn(session.id, { role: 'user', text: userMessage, rubric: null, ts });

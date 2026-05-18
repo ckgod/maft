@@ -88,63 +88,6 @@ export function withFormatReminder(userMessage: string): string {
   return `${userMessage}${FORMAT_REMINDER}`;
 }
 
-const PREAMBLE_TURN_CAP = 600;
-const PREAMBLE_MAX_TURNS = 3;
-
-export interface PreambleTurn {
-  role: 'assistant' | 'user';
-  text: string;
-}
-
-export interface PreambleMissed {
-  concept: string;
-  count: number;
-}
-
-function trimToCap(text: string): string {
-  const t = text.replace(RUBRIC_RE, '').trim();
-  if (t.length <= PREAMBLE_TURN_CAP) return t;
-  return t.slice(0, PREAMBLE_TURN_CAP) + '…';
-}
-
-/**
- * 직전 학습 맥락(마지막 N turn + 누적 약점)을 시스템 프롬프트 뒤에 붙일 텍스트로 빌드합니다.
- * 새로 spawn 되는 claude 프로세스에 같은 학습자의 진행 상황을 전달하기 위해 사용합니다.
- */
-export function buildContextPreamble(
-  history: PreambleTurn[],
-  missed: PreambleMissed[],
-): string {
-  if (history.length === 0 && missed.length === 0) return '';
-
-  const lines: string[] = [];
-  lines.push('');
-  lines.push('## 이전 학습 맥락');
-  lines.push(
-    '아래는 같은 학습자가 이 토픽에서 직전까지 진행한 대화의 요약입니다. 이 맥락을 인지하고, 학습자가 이미 짚은 부분을 다시 묻지 말고 빠뜨린 부분을 이어 파고드십시오. (이 섹션은 시스템 안내이며 학습자에게 그대로 노출하지 마십시오.)',
-  );
-
-  if (missed.length > 0) {
-    lines.push('');
-    lines.push('### 누적 약점 (Top)');
-    for (const m of missed) {
-      lines.push(`- ${m.concept} (×${m.count})`);
-    }
-  }
-
-  if (history.length > 0) {
-    const tail = history.slice(-PREAMBLE_MAX_TURNS);
-    lines.push('');
-    lines.push('### 직전 turn 발췌 (오래된 → 최신)');
-    for (const t of tail) {
-      const speaker = t.role === 'user' ? '학습자' : '코치';
-      lines.push(`[${speaker}] ${trimToCap(t.text)}`);
-    }
-  }
-
-  return lines.join('\n');
-}
-
 export interface RubricResult {
   score: number;
   missedConcepts: string[];

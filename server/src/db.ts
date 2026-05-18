@@ -21,7 +21,8 @@ db.exec(`
     last_score INTEGER,
     last_missed TEXT,
     last_next_focus TEXT,
-    mastered INTEGER NOT NULL DEFAULT 0
+    mastered INTEGER NOT NULL DEFAULT 0,
+    claude_session_id TEXT
   );
 
   CREATE INDEX IF NOT EXISTS idx_sessions_topic_id ON sessions(topic_id);
@@ -53,6 +54,16 @@ db.exec(`
 
   CREATE INDEX IF NOT EXISTS idx_concept_misses_count ON concept_misses(count DESC);
 `);
+
+// 멱등 마이그레이션: 기존 DB 에 claude_session_id 컬럼이 없으면 추가하고 id 값으로 백필합니다.
+// 새 DB 는 CREATE TABLE 단계에서 이미 컬럼이 들어가 있으므로 ALTER 가 도지 않습니다.
+{
+  const cols = db.prepare(`PRAGMA table_info(sessions)`).all() as Array<{ name: string }>;
+  if (!cols.some((c) => c.name === 'claude_session_id')) {
+    db.exec(`ALTER TABLE sessions ADD COLUMN claude_session_id TEXT`);
+    db.exec(`UPDATE sessions SET claude_session_id = id WHERE claude_session_id IS NULL`);
+  }
+}
 
 export function dbPath(): string {
   return DB_PATH;

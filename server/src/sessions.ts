@@ -15,6 +15,8 @@ export interface Session {
   history: SessionTurn[];
   lastRubric: RubricResult | null;
   mastered: boolean;
+  /** claude CLI 측 세션 ID. --resume 인자로 그대로 넘깁니다. 초기엔 id 와 같지만, claude 가 새 ID 를 돌려주면 갱신됩니다. */
+  claudeSessionId: string;
 }
 
 interface SessionRow {
@@ -26,6 +28,7 @@ interface SessionRow {
   last_missed: string | null;
   last_next_focus: string | null;
   mastered: number;
+  claude_session_id: string | null;
 }
 
 interface TurnRow {
@@ -41,9 +44,13 @@ interface TurnRow {
 }
 
 const insertSessionStmt = db.prepare(`
-  INSERT INTO sessions (id, topic_id, created_at, updated_at, last_score, last_missed, last_next_focus, mastered)
-  VALUES (@id, @topic_id, @created_at, @updated_at, @last_score, @last_missed, @last_next_focus, @mastered)
+  INSERT INTO sessions (id, topic_id, created_at, updated_at, last_score, last_missed, last_next_focus, mastered, claude_session_id)
+  VALUES (@id, @topic_id, @created_at, @updated_at, @last_score, @last_missed, @last_next_focus, @mastered, @claude_session_id)
 `);
+
+const updateClaudeSessionIdStmt = db.prepare(
+  `UPDATE sessions SET claude_session_id = @claude_session_id WHERE id = @id`,
+);
 
 const updateSessionStmt = db.prepare(`
   UPDATE sessions
@@ -113,6 +120,7 @@ function rowToSession(row: SessionRow): Session {
     history,
     lastRubric: rubricFromColumns(row.last_score, row.last_missed, row.last_next_focus, row.mastered),
     mastered: row.mastered === 1,
+    claudeSessionId: row.claude_session_id ?? row.id,
   };
 }
 
@@ -147,6 +155,8 @@ export interface NewSessionParams {
   topicId: string;
   createdAt: number;
   initialAssistantText: string;
+  /** claude CLI 가 발급한 세션 ID. 보통 id 와 동일하지만, 명시적으로 분리해서 저장합니다. */
+  claudeSessionId: string;
 }
 
 export function createSession(p: NewSessionParams): Session {
@@ -160,6 +170,7 @@ export function createSession(p: NewSessionParams): Session {
       last_missed: null,
       last_next_focus: null,
       mastered: 0,
+      claude_session_id: p.claudeSessionId,
     });
     insertTurnStmt.run({
       session_id: p.id,
@@ -176,6 +187,14 @@ export function createSession(p: NewSessionParams): Session {
   const created = getSession(p.id);
   if (!created) throw new Error(`createSession: failed to read back ${p.id}`);
   return created;
+}
+
+/**
+ * claude CLI 의 응답 session_id 가 우리가 보낸 값과 다를 때 갱신합니다.
+ * 우리 DB 의 sessions.id (PK) 는 절대 바꾸지 않고, claude_session_id 컬럼만 동기화합니다.
+ */
+export function updateClaudeSessionId(sessionId: string, claudeSessionId: string): void {
+  updateClaudeSessionIdStmt.run({ id: sessionId, claude_session_id: claudeSessionId });
 }
 
 export function appendTurn(sessionId: string, turn: SessionTurn): void {
