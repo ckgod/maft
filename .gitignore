@@ -20,3 +20,6 @@ server/data/
 # Dev runner pidfiles + logs
 scripts/.run/
 
+# macOS `script` 명령 기본 출력
+typescript
+

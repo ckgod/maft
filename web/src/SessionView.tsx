@@ -234,6 +234,11 @@ export function SessionView({ initial, onExit }: SessionViewProps) {
             <span className="eyebrow entry-tag">Coach · evaluating…</span>
             <div className="entry-body">
               <p className="typing">평가 중입니다.</p>
+              <span className="row-loading" aria-label="평가 중">
+                <span />
+                <span />
+                <span />
+              </span>
             </div>
           </article>
         )}

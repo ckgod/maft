@@ -833,6 +833,31 @@
 
 .entry-pending .entry-body {
   border-style: dashed;
+  border-left-color: var(--blueprint);
+  position: relative;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.entry-pending .entry-body::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(
+    90deg,
+    transparent 0%,
+    rgba(107, 157, 219, 0.09) 50%,
+    transparent 100%
+  );
+  background-size: 200% 100%;
+  animation: shimmer 1.6s linear infinite;
+  pointer-events: none;
+}
+
+.entry-pending .entry-tag {
+  color: var(--blueprint);
 }
 
 .typing {
