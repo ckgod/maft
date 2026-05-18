@@ -744,6 +744,10 @@
   border-left-color: var(--ink-4);
 }
 
+.entry-user .entry-body p {
+  white-space: pre-wrap;
+}
+
 .entry-body p {
   margin: 0 0 10px;
   line-height: 1.7;
