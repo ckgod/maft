@@ -72,6 +72,8 @@ const latestSessionByTopicStmt = db.prepare(
   `SELECT * FROM sessions WHERE topic_id = ? ORDER BY updated_at DESC, created_at DESC LIMIT 1`,
 );
 
+const deleteSessionsByTopicStmt = db.prepare(`DELETE FROM sessions WHERE topic_id = ?`);
+
 function rubricFromColumns(
   score: number | null,
   missedJson: string | null,
@@ -129,6 +131,15 @@ export function getLatestSessionByTopic(topicId: string): Session | undefined {
   const row = latestSessionByTopicStmt.get(topicId) as SessionRow | undefined;
   if (!row) return undefined;
   return rowToSession(row);
+}
+
+/**
+ * 토픽에 속한 모든 세션 행을 삭제합니다. turns 는 FK CASCADE 로 함께 정리됩니다.
+ * 호출자가 트랜잭션으로 묶어 다른 토픽 단위 데이터(concept_misses 등)와 함께 일괄 처리하는 것을 권장합니다.
+ */
+export function deleteSessionsByTopic(topicId: string): number {
+  const info = deleteSessionsByTopicStmt.run(topicId);
+  return Number(info.changes);
 }
 
 export interface NewSessionParams {

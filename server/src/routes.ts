@@ -1,5 +1,6 @@
 import { Router, type RequestHandler } from 'express';
 import { callClaude } from './claude.js';
+import { db } from './db.js';
 import {
   buildSystemPrompt,
   buildContextPreamble,
@@ -10,12 +11,14 @@ import type { TopicIndex } from './topics.js';
 import {
   appendTurn,
   createSession,
+  deleteSessionsByTopic,
   getLatestSessionByTopic,
   getSession,
   listSessions,
   updateSessionMeta,
 } from './sessions.js';
 import {
+  deleteConceptMissesForTopic,
   getMissedConceptsForTopic,
   getTopicStatsMap,
   getWeakPoints,
@@ -213,6 +216,31 @@ export function createRouter(index: TopicIndex): Router {
     res.json({ sessions: listSessions() });
   };
 
+  /**
+   * 토픽 단위 학습 데이터를 모두 삭제합니다.
+   * - sessions 행 (turns 는 FK CASCADE 로 함께 삭제)
+   * - concept_misses 행
+   * "새 세션" 진입을 깨끗한 상태에서 시작하기 위한 의도적 reset 입니다.
+   */
+  const resetTopicData: RequestHandler = (req, res) => {
+    const topicId = req.params.topicId;
+    if (typeof topicId !== 'string' || !topicId) {
+      res.status(400).json({ error: 'topicId is required' });
+      return;
+    }
+    const topic = index.byId.get(topicId);
+    if (!topic) {
+      res.status(404).json({ error: 'topic not found', topicId });
+      return;
+    }
+    const result = db.transaction(() => {
+      const sessions = deleteSessionsByTopic(topicId);
+      const misses = deleteConceptMissesForTopic(topicId);
+      return { sessions, misses };
+    })();
+    res.json({ topicId, deleted: result });
+  };
+
   const listWeakPoints: RequestHandler = (req, res) => {
     const limitRaw = req.query.limit;
     let limit = 10;
@@ -236,6 +264,7 @@ export function createRouter(index: TopicIndex): Router {
 
   router.get('/topics', getTopics);
   router.get('/topics/:topicId/last-session', getLastSessionForTopic);
+  router.delete('/topics/:topicId/data', resetTopicData);
   router.post('/sessions', startSession);
   router.get('/sessions', listAllSessions);
   router.get('/weak-points', listWeakPoints);

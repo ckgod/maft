@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import ReactMarkdown from 'react-markdown';
 import {
+  resetTopic,
   sendMessage,
   startSession,
   type Rubric,
@@ -111,7 +112,7 @@ export function SessionView({ initial, onExit }: SessionViewProps) {
   async function handleRestart() {
     if (restarting || sending) return;
     const ok = window.confirm(
-      '새 세션을 시작합니다. 이전 대화 기록은 보존되지만 토픽 클릭 시에는 새 세션이 최신으로 노출됩니다. 계속하시겠습니까?',
+      '새 세션을 시작합니다. 이 토픽의 모든 학습 기록(이전 세션, 누적 약점, 시도 횟수·베스트 점수·마스터 상태)이 삭제되고 처음부터 다시 시작합니다. 계속하시겠습니까?',
     );
     if (!ok) return;
     setError(null);
@@ -120,6 +121,7 @@ export function SessionView({ initial, onExit }: SessionViewProps) {
     setMessages([]);
     setMastered(false);
     try {
+      await resetTopic(activeInitial.topicId);
       const fresh = await startSession(activeInitial.topicId);
       setActiveInitial(fresh);
       setMessages(buildInitialMessages(fresh));

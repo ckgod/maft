@@ -122,6 +122,15 @@ const topicMissedConceptsStmt = db.prepare(
    LIMIT ?`,
 );
 
+const deleteConceptMissesForTopicStmt = db.prepare(
+  `DELETE FROM concept_misses WHERE topic_id = ?`,
+);
+
+export function deleteConceptMissesForTopic(topicId: string): number {
+  const info = deleteConceptMissesForTopicStmt.run(topicId);
+  return Number(info.changes);
+}
+
 export function getMissedConceptsForTopic(
   topicId: string,
   limit = 5,

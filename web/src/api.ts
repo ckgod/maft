@@ -103,6 +103,21 @@ export async function startSession(topicId: string): Promise<SessionStartRespons
   });
 }
 
+export interface TopicResetResponse {
+  topicId: string;
+  deleted: { sessions: number; misses: number };
+}
+
+/**
+ * 토픽 단위 학습 데이터(세션·turns·누적 약점)를 모두 삭제합니다.
+ * "새 세션" 흐름에서 깨끗한 상태로 다시 시작할 때 호출합니다.
+ */
+export async function resetTopic(topicId: string): Promise<TopicResetResponse> {
+  return fetchJson<TopicResetResponse>(`/api/topics/${encodeURIComponent(topicId)}/data`, {
+    method: 'DELETE',
+  });
+}
+
 /**
  * 해당 토픽의 직전 세션을 가져옵니다. 없으면 null 을 돌려줍니다 (404 를 정상 흐름으로 흡수).
  */
