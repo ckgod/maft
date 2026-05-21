@@ -31,6 +31,9 @@ function deriveTurnScore(evaluation: Evaluation): number | null {
 
 export function createRouter(index: TopicIndex): Router {
   const router = Router();
+  // 같은 세션에 평가 요청이 동시에 들어오면 claude --resume 가 겹쳐 세션 상태가
+  // 꼬일 수 있으므로, 처리 중인 세션 id 를 잠가 동시 진입을 막습니다.
+  const inFlightSessions = new Set<string>();
 
   const getTopics: RequestHandler = (_req, res) => {
     const stats = getTopicStatsMap();
@@ -77,11 +80,17 @@ export function createRouter(index: TopicIndex): Router {
 
     try {
       const systemPrompt = buildSystemPrompt(topic);
-      const result = await callClaude({ prompt: withStartReminder('학습 시작'), systemPrompt });
-
-      const concepts = extractConceptList(result.text);
+      // 개념 목록 JSON 이 누락되면 세션이 사용 불능(마스터 불가·패널 빈 상태)이 되므로,
+      // 누락 시 새 claude 세션으로 한 번 재시도합니다.
+      let result = await callClaude({ prompt: withStartReminder('학습 시작'), systemPrompt });
+      let concepts = extractConceptList(result.text);
       if (!concepts) {
-        console.warn(`[startSession] 개념 목록 JSON 누락 — topic=${topic.id}`);
+        console.warn(`[startSession] 개념 목록 JSON 누락 — 재시도. topic=${topic.id}`);
+        result = await callClaude({ prompt: withStartReminder('학습 시작'), systemPrompt });
+        concepts = extractConceptList(result.text);
+      }
+      if (!concepts) {
+        console.error(`[startSession] 재시도 후에도 개념 목록 누락 — topic=${topic.id}`);
       }
 
       const session = createSession({
@@ -132,6 +141,15 @@ export function createRouter(index: TopicIndex): Router {
       return;
     }
 
+    if (inFlightSessions.has(session.id)) {
+      res.status(409).json({
+        error: 'a response for this session is already being processed',
+        sessionId: session.id,
+      });
+      return;
+    }
+    inFlightSessions.add(session.id);
+
     try {
       // `--resume` 는 대화 history 만 복원할 뿐 `--system-prompt` 는 보존하지 않습니다.
       // 따라서 매 턴 시스템 프롬프트(파인만 코치 규칙 + 토픽 원문)를 다시 주입해야
@@ -176,6 +194,8 @@ export function createRouter(index: TopicIndex): Router {
     } catch (e) {
       const msg = e instanceof Error ? e.message : String(e);
       res.status(500).json({ error: 'claude call failed', detail: msg });
+    } finally {
+      inFlightSessions.delete(session.id);
     }
   };
 
