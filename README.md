@@ -11,7 +11,7 @@
 **파인만 학습 기법**(자기 설명 → 평가 → 빈틈 역질문 → 재학습) 을 인터랙티브로 구현해 이해도가 일정 수준에 도달할 때까지 가르쳐 주는 학습 도구입니다.
 
 학습자가 토픽을 자기 말로 풀어내면, AI 코치가 토픽 원문을 기준으로 채점하고 학습자가 빠뜨린 핵심 개념을 가리키는 역질문을 돌려줍니다.
-모든 점수와 누적 약점이 SQLite 에 영속화되므로, 어떤 토픽을 얼마나 깊이 이해했는지가 인덱스와 사이드바에 그대로 드러납니다.
+토픽은 핵심 개념 3~5개로 분해되어 개념별 점수와 진척이 SQLite 에 영속화되므로, 어떤 개념을 얼마나 이해했는지가 체크리스트와 인덱스에 그대로 드러납니다.
 
 ## 화면
 
@@ -19,15 +19,15 @@
 
 ![](docs/img/index.png)
 
-학습 세션 — 점수 패널과 Recurring Gaps, 코치의 마스터 안내
+학습 세션 — 개념 체크리스트와 코치의 소크라테스식 역질문
 
 ![](docs/img/session.png)
 
-점수 패널 단독 — turns / latest / average / best + sparkline + recurring gaps
+개념 체크리스트 — 개념별 0~5 점수 · 상태 뱃지 · 통합 점수
 
 ![](docs/img/rubric.png)
 
-> 캡처는 `Q12-State-hoisting.md` 토픽으로 답변 3회를 진행해 mastered 도달까지 만든 시점입니다.
+> 캡처는 `Q12-State-hoisting.md` 토픽을 진행하던 시점입니다.
 
 ## 학습 사이클
 
@@ -42,18 +42,18 @@ sequenceDiagram
   U->>W: 토픽 선택
   W->>S: POST /api/sessions { topicId }
   S->>C: claude -p "학습 시작" --system-prompt 〈파인만 코치 + 토픽 원문〉
-  C-->>S: 세션 ID · 청자/범위 안내
-  S->>S: createSession · appendTurn(assistant)
-  S-->>W: { sessionId, message }
+  C-->>S: 청자/범위 안내 + 핵심 개념 목록 JSON
+  S->>S: extractConceptList · createSession (개념 영속화)
+  S-->>W: { sessionId, message, concepts }
 
-  loop 코칭 사이클 (mastered = true 까지)
+  loop 코칭 사이클 (모든 개념 + 통합 마스터까지)
     U->>W: 자기 설명 입력
     W->>S: POST /api/sessions/:id/messages
-    S->>C: claude -p --resume sessionId 〈+ 형식 reminder〉
-    C-->>S: 평가문 + 다음 질문 + JSON 채점 블록
-    S->>S: extractRubric · appendTurn · updateSessionMeta · recordMissedConcepts
-    S-->>W: { message, rubric, mastered }
-    W-->>U: 코치 메시지 · 점수 sparkline · 누적 약점
+    S->>C: claude -p --resume sessionId 〈+ 시스템 프롬프트 + 형식 reminder〉
+    C-->>S: 평가문 + 다음 질문 + 개념별 채점 JSON
+    S->>S: extractEvaluation · appendTurn · applyEvaluation (best_score 갱신)
+    S-->>W: { message, concepts, integrationScore, mastered }
+    W-->>U: 코치 메시지 · 개념 체크리스트
   end
 ```
 
@@ -89,37 +89,38 @@ flowchart LR
 
 ```mermaid
 erDiagram
+  sessions ||--o{ concepts : has
   sessions ||--o{ turns : has
   sessions {
     TEXT id PK
     TEXT topic_id
     INTEGER created_at
     INTEGER updated_at
-    INTEGER last_score
-    TEXT last_missed
-    TEXT last_next_focus
+    TEXT claude_session_id
+    TEXT next_focus
+    INTEGER integration_score
     INTEGER mastered
+  }
+  concepts {
+    TEXT session_id FK
+    TEXT concept_id PK
+    INTEGER ordinal
+    TEXT name
+    TEXT criterion
+    INTEGER best_score
   }
   turns {
     INTEGER id PK
     TEXT session_id FK
     TEXT role
     TEXT text
-    INTEGER score
-    TEXT missed_concepts
-    TEXT next_focus
-    INTEGER mastered
+    INTEGER turn_score
+    TEXT eval_json
     INTEGER ts
-  }
-  concept_misses {
-    TEXT topic_id PK
-    TEXT concept PK
-    INTEGER count
-    INTEGER last_seen_at
   }
 ```
 
-토픽별 통계(베스트 점수 · 시도 횟수 · 마스터 여부)는 `sessions` 테이블 위의 집계 쿼리로 도출합니다(별도 머터리얼라이즈 테이블 없음). 누적 약점은 평가 응답마다 `missed_concepts` 를 정규화(trim · lowercase) 후 `concept_misses` 에 UPSERT 합니다.
+채점 단위는 "턴"이 아니라 "개념"입니다. 매 평가 턴은 답변이 다룬 개념들의 `best_score` 를 끌어올리며(한 답변이 여러 개념을 동시에 갱신할 수 있음), 마스터(모든 개념 ≥3 + 통합 답변 ≥4)는 LLM 응답이 아니라 저장된 점수로 서버가 직접 판정합니다. 토픽별 진척률과 전역 약점(아직 3점 미만인 개념)은 `sessions`·`concepts` 위의 집계 쿼리로 도출합니다(별도 머터리얼라이즈 테이블 없음).
 
 ## 빠른 시작
 
@@ -165,10 +166,10 @@ open http://localhost:5173
 ## 핵심 설계 결정
 
 - **Claude Code headless 로 LLM 호출** — `claude -p` 서브프로세스를 spawn 하고 `--output-format json` 을 파싱합니다. `--bare` 옵션을 사용하지 않으면 OAuth(claude.ai 구독) 자격증명이 자동으로 적용되므로 별도 API 키 없이 구독 한도 내에서 동작합니다.
-- **시스템 프롬프트의 JSON 채점 블록 강제** — 모든 평가 응답 끝에 `{score, missed_concepts, next_focus, mastered}` JSON 블록을 코드블록으로 첨부하도록 강제하고, 후속 메시지마다 형식 reminder 를 자동으로 첨부합니다. 키 변형(`scores`, `missingConcepts` 등) 도 시스템 프롬프트에서 명시적으로 금지해 LLM 변동성을 흡수합니다.
+- **개념 단위 채점** — 토픽을 핵심 개념 3~5개로 분해하고, 학습 시작 시 코치가 개념 체크리스트를 JSON 으로 산출해 `concepts` 테이블에 영속화합니다. 이후 평가 턴마다 코치는 답변이 다룬 개념별 점수(`{scores, integration_score, next_focus, mastered}`)를 첨부하며, 한 답변이 여러 개념을 동시에 끌어올릴 수 있습니다. 키 변형 금지·형식 reminder 자동 첨부로 LLM 변동성을 흡수하고, 시작 시 개념 JSON 이 누락되면 1회 재시도합니다.
 - **점수 인플레이션 방지** — 같은 답변을 살짝 바꿔 재제출해도 새 정보가 없으면 점수가 오르지 않도록 시스템 프롬프트에 일관성 규칙을 두었습니다 (`score 2 → 2` 동결을 PoC 에서 확인했습니다).
 - **청자 재정의** — 일반적 파인만의 "12살 청자" 가정은 안드로이드 학습엔 부적합해 (Compose 가 무엇인지부터 풀어 설명할지 학습자가 혼란을 겪습니다), **"이 토픽은 처음 듣지만 4대 컴포넌트 · Compose Composable/State · Kotlin 기초는 아는 동료 개발자"** 로 재정의했습니다.
-- **SQLite 영속화 + 누적 약점 트래킹** — 매 메시지마다 turns 테이블에 incremental insert 하고, `missed_concepts` 를 `concept_misses` 에 UPSERT 로 누적해 사이드바 Top N Weak Points 로 노출합니다.
+- **SQLite 영속화 + 개념별 진척 추적** — 세션·개념·turns 를 SQLite 에 영속화하고, 개념별 `best_score` 로 진척을 추적해 사이드바 Weak Points(3점 미만 개념)와 인덱스 진척률(`n/N 개념`)로 노출합니다.
 
 ## 디렉토리
 
@@ -178,7 +179,7 @@ open http://localhost:5173
 │   ├── src/
 │   │   ├── claude.ts        headless 래퍼 (claude -p spawn)
 │   │   ├── topics.ts        mi.tree 정규식 파싱 · 토픽 인덱스
-│   │   ├── prompt.ts        파인만 시스템 프롬프트 + 채점 추출
+│   │   ├── prompt.ts        파인만 시스템 프롬프트 + 개념/채점 JSON 추출
 │   │   ├── routes.ts        REST API
 │   │   ├── sessions.ts      SQLite 세션 영속화
 │   │   ├── stats.ts         토픽 통계 + Weak Points 집계
@@ -190,7 +191,7 @@ open http://localhost:5173
     └── src/
         ├── App.tsx          토픽 인덱스 + Weak Points 사이드바
         ├── SessionView.tsx  학습 세션 화면 (Coach / Response 엔트리)
-        ├── ScorePanel.tsx   Figure 01 · Rubric (sparkline + recurring gaps)
+        ├── ScorePanel.tsx   Figure 01 · 개념 체크리스트 (점수·상태·통합)
         ├── api.ts           REST 클라이언트
         ├── App.css          Schematic Dark — layout / 세션
         └── index.css        디자인 토큰 + 진입 애니메이션
@@ -198,7 +199,7 @@ open http://localhost:5173
 
 ## 디자인 톤
 
-차분한 학습 환경을 의도해 **Schematic Dark** 톤으로 정리했습니다. Geist + Pretendard Variable, paper `#0e1014`, 강조색 blueprint `#6b9ddb`, 점수 팔레트 (moss / amber / sienna / slate) 로 구성되어 있습니다. 게임화는 인플레이션을 피하고자 차분한 배지 (`best 3/5 · ×2`, `★ mastered`) 와 작은 sparkline 막대만으로 한정합니다.
+차분한 학습 환경을 의도해 **Schematic Dark** 톤으로 정리했습니다. Geist + Pretendard Variable, paper `#0e1014`, 강조색 blueprint `#6b9ddb`, 점수 팔레트 (moss / amber / sienna / slate) 로 구성되어 있습니다. 게임화는 인플레이션을 피하고자 차분한 배지 (`3/4 개념`, `★ mastered`) 와 개념별 0~5 점수 미터만으로 한정합니다.
 
 ## 한계 / 다음 단계
 
