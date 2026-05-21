@@ -36,11 +36,15 @@
 - [x] `routes.ts` — startSession 개념 파싱·저장, postMessage 개념별 best score 갱신, 마스터를 서버가 계산
 - [x] 검증 — DB 폐기 후 새 세션 API 테스트. 한 답변이 c2·c3 동시 4점, 마스터 서버 계산 확인
 
-### Phase 2 — 프론트엔드
-- [ ] `api.ts` — 응답 타입 갱신
-- [ ] `ScorePanel.tsx` — 개념 체크리스트 (개념명 + 0~5 막대 + 상태 뱃지)
-- [ ] `App.tsx` / `SessionView.tsx` — 인덱스 진척 표시·세션 hydration 연동
-- [ ] 검증 — 브라우저 학습 흐름 확인
+### Phase 2 — 프론트엔드 ✅
+- [x] `api.ts` — 응답 타입 갱신 (concepts/integrationScore, TopicStats, WeakPoint)
+- [x] `ScorePanel.tsx` — 개념 체크리스트 (개념명 + 0~5 미터 + 상태 뱃지 + 통합 점수)
+- [x] `App.tsx` / `SessionView.tsx` — 인덱스 진척 라벨(n/n 개념), 개념 상태 세션 추적
+- [x] 검증 — tsc -b + vite build 통과, Playwright 로 인덱스·세션 렌더 확인
+
+> 완료 (2026-05-21): Tier 2 양 Phase 모두 적용·검증·커밋. 채점 단위가 개념으로
+> 바뀌어 진척·마스터가 실제 데이터로 계산됨. 남은 후속: prompt-review.md 의 P5
+> (deflist 활용 심화)·P8 (README 갱신) 등은 별도 항목.
 
 ---
 

@@ -1345,3 +1345,110 @@
     min-height: 56px;
   }
 }
+
+/* ==========================================================================
+   Tier 2 — 개념 체크리스트 (ScorePanel)
+   ========================================================================== */
+
+.concept-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+}
+
+.concept-row {
+  display: grid;
+  grid-template-columns: 1fr auto auto 76px;
+  gap: 6px 14px;
+  align-items: center;
+  padding: 9px 0;
+  border-top: 1px dashed var(--rule);
+}
+
+.concept-row:first-child {
+  border-top: none;
+  padding-top: 2px;
+}
+
+.concept-name {
+  font-size: var(--tt-s);
+  color: var(--ink);
+  line-height: 1.4;
+}
+
+.concept-row.is-pending .concept-name {
+  color: var(--ink-3);
+}
+
+.concept-meter {
+  display: inline-flex;
+  gap: 3px;
+}
+
+.concept-seg {
+  width: 13px;
+  height: 6px;
+  border: 1px solid var(--rule);
+  background: var(--paper-2);
+}
+
+.concept-score {
+  font-family: var(--font-display);
+  font-size: var(--tt-m);
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+  line-height: 1;
+  text-align: right;
+}
+
+.concept-status {
+  font-family: var(--font-mono);
+  font-size: var(--tt-xs);
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  text-align: right;
+}
+
+.concept-row.is-cleared .concept-status {
+  color: var(--moss);
+}
+
+.concept-row.is-progress .concept-status {
+  color: var(--amber);
+}
+
+.concept-row.is-pending .concept-status {
+  color: var(--ink-4);
+}
+
+.concept-integration {
+  border-top: 1px dashed var(--rule);
+  padding-top: 12px;
+  display: flex;
+  align-items: baseline;
+  gap: 12px;
+}
+
+.concept-integration-score {
+  font-family: var(--font-display);
+  font-size: var(--tt-l);
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+  line-height: 1;
+}
+
+.concept-integration-max {
+  font-family: var(--font-mono);
+  font-size: var(--tt-xs);
+  color: var(--ink-4);
+  margin-left: 2px;
+}
+
+.concept-integration-hint {
+  font-family: var(--font-mono);
+  font-size: var(--tt-xs);
+  letter-spacing: 0.06em;
+  color: var(--ink-3);
+}

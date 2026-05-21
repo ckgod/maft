@@ -4,17 +4,15 @@ import {
   resetTopic,
   sendMessage,
   startSession,
-  type Rubric,
+  type SessionConcept,
   type SessionStartResponse,
   type SessionTurn,
 } from './api';
-import { ScoreBadge } from './ScoreBadge';
 import { ScorePanel } from './ScorePanel';
 
 export interface Message {
   role: 'assistant' | 'user';
   text: string;
-  rubric: Rubric | null;
 }
 
 interface SessionViewProps {
@@ -23,23 +21,18 @@ interface SessionViewProps {
 }
 
 function turnsToMessages(turns: SessionTurn[]): Message[] {
-  return turns.map((t) => ({ role: t.role, text: t.text, rubric: t.rubric }));
+  return turns.map((t) => ({ role: t.role, text: t.text }));
 }
 
 function buildInitialMessages(initial: SessionStartResponse): Message[] {
   if (initial.turns && initial.turns.length > 0) {
     return turnsToMessages(initial.turns);
   }
-  return [{ role: 'assistant', text: initial.message, rubric: initial.rubric }];
+  return [{ role: 'assistant', text: initial.message }];
 }
 
-const RUBRIC_BLOCK_RE = /```json\s*[\s\S]*?\s*```\s*$/m;
 const Q_RE = /^Q(\d+)/;
 const E_RE = /^E(\d+)/;
-
-function stripRubricBlock(text: string): string {
-  return text.replace(RUBRIC_BLOCK_RE, '').trimEnd();
-}
 
 function topicNumber(id: string): string {
   const q = id.match(Q_RE);
@@ -64,6 +57,10 @@ export function SessionView({ initial, onExit }: SessionViewProps) {
   // initial.turns 가 채워져 있으면 hydration, 없으면 opening 메시지만으로 시작.
   const [activeInitial, setActiveInitial] = useState<SessionStartResponse>(initial);
   const [messages, setMessages] = useState<Message[]>(() => buildInitialMessages(initial));
+  const [concepts, setConcepts] = useState<SessionConcept[]>(initial.concepts);
+  const [integrationScore, setIntegrationScore] = useState<number | null>(
+    initial.integrationScore,
+  );
   const [input, setInput] = useState('');
   const [sending, setSending] = useState(false);
   const [restarting, setRestarting] = useState(false);
@@ -93,15 +90,14 @@ export function SessionView({ initial, onExit }: SessionViewProps) {
     if (!text || sending) return;
     setError(null);
     setSending(true);
-    setMessages((prev) => [...prev, { role: 'user', text, rubric: null }]);
+    setMessages((prev) => [...prev, { role: 'user', text }]);
     setInput('');
     try {
       const res = await sendMessage(activeInitial.sessionId, text);
-      setMessages((prev) => [
-        ...prev,
-        { role: 'assistant', text: res.message, rubric: res.rubric },
-      ]);
-      if (res.mastered) setMastered(true);
+      setMessages((prev) => [...prev, { role: 'assistant', text: res.message }]);
+      setConcepts(res.concepts);
+      setIntegrationScore(res.integrationScore);
+      setMastered(res.mastered);
     } catch (e) {
       setError(e instanceof Error ? e.message : String(e));
     } finally {
@@ -112,19 +108,23 @@ export function SessionView({ initial, onExit }: SessionViewProps) {
   async function handleRestart() {
     if (restarting || sending) return;
     const ok = window.confirm(
-      '새 세션을 시작합니다. 이 토픽의 모든 학습 기록(이전 세션, 누적 약점, 시도 횟수·베스트 점수·마스터 상태)이 삭제되고 처음부터 다시 시작합니다. 계속하시겠습니까?',
+      '새 세션을 시작합니다. 이 토픽의 모든 학습 기록(이전 세션, 개념별 점수, 시도 횟수·마스터 상태)이 삭제되고 처음부터 다시 시작합니다. 계속하시겠습니까?',
     );
     if (!ok) return;
     setError(null);
     setRestarting(true);
     // claude spawn 이 10~30s 걸리므로 thread 영역을 즉시 비워 시작 신호를 명확히 만듭니다.
     setMessages([]);
+    setConcepts([]);
+    setIntegrationScore(null);
     setMastered(false);
     try {
       await resetTopic(activeInitial.topicId);
       const fresh = await startSession(activeInitial.topicId);
       setActiveInitial(fresh);
       setMessages(buildInitialMessages(fresh));
+      setConcepts(fresh.concepts);
+      setIntegrationScore(fresh.integrationScore);
       setMastered(fresh.mastered);
     } catch (e) {
       setError(e instanceof Error ? e.message : String(e));
@@ -168,7 +168,9 @@ export function SessionView({ initial, onExit }: SessionViewProps) {
       </header>
 
       <ScorePanel
-        messages={messages}
+        concepts={concepts}
+        integrationScore={integrationScore}
+        mastered={mastered}
         collapsible={isNarrow}
         open={panelOpen}
         onToggle={() => setPanelOpen((o) => !o)}
@@ -213,20 +215,9 @@ export function SessionView({ initial, onExit }: SessionViewProps) {
                 <span className="eyebrow entry-tag">
                   {isOpening ? 'Coach · Opening' : `Coach · No. ${pad2(coachTurn - 1)}`}
                 </span>
-                {m.rubric && <ScoreBadge score={m.rubric.score} />}
               </div>
               <div className="entry-body">
-                <ReactMarkdown>{stripRubricBlock(m.text)}</ReactMarkdown>
-                {m.rubric && m.rubric.missedConcepts.length > 0 && (
-                  <aside className="errata">
-                    <span className="eyebrow">Missed concepts</span>
-                    <ul>
-                      {m.rubric.missedConcepts.map((c, j) => (
-                        <li key={j}>{c}</li>
-                      ))}
-                    </ul>
-                  </aside>
-                )}
+                <ReactMarkdown>{m.text}</ReactMarkdown>
               </div>
             </article>
           );

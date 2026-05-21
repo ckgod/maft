@@ -19,8 +19,10 @@ function shortId(id: string): string {
 function rowKindLabel(t: Topic, starting: boolean): string {
   if (starting) return 'starting';
   if (t.stats.mastered) return '★ mastered';
-  if (t.stats.attempts > 0 && t.stats.bestScore !== null) {
-    return `best ${t.stats.bestScore}/5 · ×${t.stats.attempts}`;
+  if (t.stats.attempts > 0) {
+    const progress =
+      t.stats.bestTotal > 0 ? `${t.stats.bestCleared}/${t.stats.bestTotal} 개념 · ` : '';
+    return `${progress}×${t.stats.attempts}`;
   }
   return t.kind === 'extra' ? 'extra' : 'question';
 }
@@ -194,9 +196,9 @@ export default function App() {
                 <li
                   key={`${w.topicId}::${w.concept}`}
                   className="weak-item"
-                  title={`${w.topicTitle} · ${w.count}회 누락`}
+                  title={`${w.topicTitle} · best ${w.bestScore}/5`}
                 >
-                  <span className="weak-count">×{w.count}</span>
+                  <span className="weak-count">{w.bestScore}/5</span>
                   <span className="weak-concept">{w.concept}</span>
                 </li>
               ))}

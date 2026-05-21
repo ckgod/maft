@@ -2,9 +2,11 @@ export type TopicKind = 'category' | 'question' | 'detail' | 'extra';
 
 export interface TopicStats {
   attempts: number;
-  bestScore: number | null;
-  lastScore: number | null;
   mastered: boolean;
+  /** 3점 이상 달성한 개념 수 (가장 잘한 세션 기준). */
+  bestCleared: number;
+  /** 그 세션의 총 개념 수. */
+  bestTotal: number;
 }
 
 export interface Topic {
@@ -28,17 +30,19 @@ export interface TopicsResponse {
   categories: Category[];
 }
 
-export interface Rubric {
-  score: number;
-  missedConcepts: string[];
-  nextFocus: string;
-  mastered: boolean;
+/** 세션의 핵심 개념 한 건. best_score 가 누적 최고 점수 (0 = 미착수). */
+export interface SessionConcept {
+  id: string;
+  ordinal: number;
+  name: string;
+  criterion: string;
+  bestScore: number;
 }
 
 export interface SessionTurn {
   role: 'assistant' | 'user';
   text: string;
-  rubric: Rubric | null;
+  turnScore: number | null;
   ts: number;
 }
 
@@ -47,7 +51,9 @@ export interface SessionStartResponse {
   topicId: string;
   topicTitle: string;
   message: string;
-  rubric: Rubric | null;
+  concepts: SessionConcept[];
+  integrationScore: number | null;
+  nextFocus: string;
   mastered: boolean;
   /** 재개일 때만 채워집니다 (opening 메시지 포함 누적 turn). */
   turns?: SessionTurn[];
@@ -57,7 +63,9 @@ export interface SessionMessageResponse {
   sessionId: string;
   topicId: string;
   message: string;
-  rubric: Rubric | null;
+  concepts: SessionConcept[];
+  integrationScore: number | null;
+  nextFocus: string;
   mastered: boolean;
 }
 
@@ -84,7 +92,8 @@ export interface WeakPoint {
   topicId: string;
   topicTitle: string;
   concept: string;
-  count: number;
+  /** 그 개념의 누적 최고 점수 (3 미만이라 약점으로 노출됨). */
+  bestScore: number;
   lastSeenAt: number;
 }
 
@@ -105,11 +114,11 @@ export async function startSession(topicId: string): Promise<SessionStartRespons
 
 export interface TopicResetResponse {
   topicId: string;
-  deleted: { sessions: number; misses: number };
+  deleted: { sessions: number };
 }
 
 /**
- * 토픽 단위 학습 데이터(세션·turns·누적 약점)를 모두 삭제합니다.
+ * 토픽 단위 학습 데이터(세션·개념·turns)를 모두 삭제합니다.
  * "새 세션" 흐름에서 깨끗한 상태로 다시 시작할 때 호출합니다.
  */
 export async function resetTopic(topicId: string): Promise<TopicResetResponse> {
