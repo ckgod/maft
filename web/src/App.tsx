@@ -3,13 +3,11 @@ import {
   getLastSessionForTopic,
   listTopics,
   listWeakPoints,
-  startSession,
   type Category,
-  type SessionStartResponse,
   type Topic,
   type WeakPoint,
 } from './api';
-import { SessionView } from './SessionView';
+import { SessionView, type SessionInit } from './SessionView';
 import './App.css';
 
 function shortId(id: string): string {
@@ -47,7 +45,7 @@ function categoryLabel(title: string): string {
 type AppMode =
   | { kind: 'list' }
   | { kind: 'starting'; topicId: string }
-  | { kind: 'session'; data: SessionStartResponse };
+  | { kind: 'session'; data: SessionInit };
 
 export default function App() {
   const [topics, setTopics] = useState<Topic[] | null>(null);
@@ -123,14 +121,19 @@ export default function App() {
     setStartError(null);
     setMode({ kind: 'starting', topicId });
     try {
-      // 직전 세션이 있으면 mastered 여부와 무관하게 그대로 이어갑니다.
+      // 직전 세션이 있으면 mastered 여부와 무관하게 그대로 이어갑니다 (빠른 조회).
       const resumed = await getLastSessionForTopic(topicId);
       if (resumed) {
-        setMode({ kind: 'session', data: resumed });
+        setMode({ kind: 'session', data: { kind: 'resume', data: resumed } });
         return;
       }
-      const data = await startSession(topicId);
-      setMode({ kind: 'session', data });
+      // 기록이 없으면 — 느린 startSession 을 인덱스에서 기다리지 않고, 세션 화면으로
+      // 먼저 전환한 뒤 SessionView 안에서 시작을 기다립니다.
+      const topic = topics?.find((t) => t.id === topicId);
+      setMode({
+        kind: 'session',
+        data: { kind: 'fresh', topicId, topicTitle: topic?.title ?? topicId },
+      });
     } catch (e) {
       setStartError(e instanceof Error ? e.message : String(e));
       setMode({ kind: 'list' });

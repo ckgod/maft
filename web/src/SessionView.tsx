@@ -15,8 +15,18 @@ export interface Message {
   text: string;
 }
 
+/**
+ * SessionView 진입 형태:
+ * - resume: 직전 세션을 이미 받아온 상태 (App 이 빠른 조회로 확보).
+ * - fresh: 기록이 없어 새로 시작 — 느린 startSession 을 SessionView 안에서 기다립니다.
+ *   (인덱스에서 멈춰 기다리지 않고 세션 화면으로 먼저 넘어오기 위함.)
+ */
+export type SessionInit =
+  | { kind: 'resume'; data: SessionStartResponse }
+  | { kind: 'fresh'; topicId: string; topicTitle: string };
+
 interface SessionViewProps {
-  initial: SessionStartResponse;
+  initial: SessionInit;
   onExit: () => void;
 }
 
@@ -24,11 +34,11 @@ function turnsToMessages(turns: SessionTurn[]): Message[] {
   return turns.map((t) => ({ role: t.role, text: t.text }));
 }
 
-function buildInitialMessages(initial: SessionStartResponse): Message[] {
-  if (initial.turns && initial.turns.length > 0) {
-    return turnsToMessages(initial.turns);
+function buildInitialMessages(start: SessionStartResponse): Message[] {
+  if (start.turns && start.turns.length > 0) {
+    return turnsToMessages(start.turns);
   }
-  return [{ role: 'assistant', text: initial.message }];
+  return [{ role: 'assistant', text: start.message }];
 }
 
 const Q_RE = /^Q(\d+)/;
@@ -54,24 +64,52 @@ function readInitialNarrow(): boolean {
 }
 
 export function SessionView({ initial, onExit }: SessionViewProps) {
-  // initial.turns 가 채워져 있으면 hydration, 없으면 opening 메시지만으로 시작.
-  const [activeInitial, setActiveInitial] = useState<SessionStartResponse>(initial);
-  const [messages, setMessages] = useState<Message[]>(() => buildInitialMessages(initial));
-  const [concepts, setConcepts] = useState<SessionConcept[]>(initial.concepts);
-  const [integrationScore, setIntegrationScore] = useState<number | null>(
-    initial.integrationScore,
+  const resumed = initial.kind === 'resume' ? initial.data : null;
+
+  const [session, setSession] = useState<SessionStartResponse | null>(resumed);
+  const [messages, setMessages] = useState<Message[]>(() =>
+    resumed ? buildInitialMessages(resumed) : [],
   );
+  const [concepts, setConcepts] = useState<SessionConcept[]>(resumed?.concepts ?? []);
+  const [integrationScore, setIntegrationScore] = useState<number | null>(
+    resumed?.integrationScore ?? null,
+  );
+  const [mastered, setMastered] = useState(resumed?.mastered ?? false);
+  const [starting, setStarting] = useState(initial.kind === 'fresh');
   const [input, setInput] = useState('');
   const [sending, setSending] = useState(false);
   const [restarting, setRestarting] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [mastered, setMastered] = useState(initial.mastered);
   const [isNarrow, setIsNarrow] = useState<boolean>(readInitialNarrow);
   const [panelOpen, setPanelOpen] = useState(false);
   const scrollRef = useRef<HTMLDivElement>(null);
+  const startedRef = useRef(false);
 
+  const topicId = initial.kind === 'resume' ? initial.data.topicId : initial.topicId;
+  const topicTitle = initial.kind === 'resume' ? initial.data.topicTitle : initial.topicTitle;
   const isResuming =
-    !restarting && !!(activeInitial.turns && activeInitial.turns.length > 1);
+    !restarting &&
+    initial.kind === 'resume' &&
+    !!(initial.data.turns && initial.data.turns.length > 1);
+  // 새 세션 준비 또는 재시작 — 둘 다 thread 에 로딩 엔트리를 띄웁니다.
+  const booting = starting || restarting;
+
+  // fresh 진입이면 화면 전환 직후 startSession 을 호출합니다. ref 가드로 StrictMode
+  // 의 effect 이중 호출에도 한 번만 spawn 합니다.
+  useEffect(() => {
+    if (initial.kind !== 'fresh' || startedRef.current) return;
+    startedRef.current = true;
+    startSession(initial.topicId)
+      .then((fresh) => {
+        setSession(fresh);
+        setMessages(buildInitialMessages(fresh));
+        setConcepts(fresh.concepts);
+        setIntegrationScore(fresh.integrationScore);
+        setMastered(fresh.mastered);
+      })
+      .catch((e) => setError(e instanceof Error ? e.message : String(e)))
+      .finally(() => setStarting(false));
+  }, [initial]);
 
   useEffect(() => {
     const mq = window.matchMedia(NARROW_QUERY);
@@ -83,17 +121,17 @@ export function SessionView({ initial, onExit }: SessionViewProps) {
   useEffect(() => {
     const el = scrollRef.current;
     if (el) el.scrollTo({ top: el.scrollHeight, behavior: 'smooth' });
-  }, [messages, sending]);
+  }, [messages, sending, booting]);
 
   async function handleSend() {
     const text = input.trim();
-    if (!text || sending) return;
+    if (!text || sending || !session) return;
     setError(null);
     setSending(true);
     setMessages((prev) => [...prev, { role: 'user', text }]);
     setInput('');
     try {
-      const res = await sendMessage(activeInitial.sessionId, text);
+      const res = await sendMessage(session.sessionId, text);
       setMessages((prev) => [...prev, { role: 'assistant', text: res.message }]);
       setConcepts(res.concepts);
       setIntegrationScore(res.integrationScore);
@@ -106,7 +144,7 @@ export function SessionView({ initial, onExit }: SessionViewProps) {
   }
 
   async function handleRestart() {
-    if (restarting || sending) return;
+    if (restarting || sending || starting) return;
     const ok = window.confirm(
       '새 세션을 시작합니다. 이 토픽의 모든 학습 기록(이전 세션, 개념별 점수, 시도 횟수·마스터 상태)이 삭제되고 처음부터 다시 시작합니다. 계속하시겠습니까?',
     );
@@ -119,9 +157,9 @@ export function SessionView({ initial, onExit }: SessionViewProps) {
     setIntegrationScore(null);
     setMastered(false);
     try {
-      await resetTopic(activeInitial.topicId);
-      const fresh = await startSession(activeInitial.topicId);
-      setActiveInitial(fresh);
+      await resetTopic(topicId);
+      const fresh = await startSession(topicId);
+      setSession(fresh);
       setMessages(buildInitialMessages(fresh));
       setConcepts(fresh.concepts);
       setIntegrationScore(fresh.integrationScore);
@@ -144,10 +182,10 @@ export function SessionView({ initial, onExit }: SessionViewProps) {
         </button>
         <div className="session-meta">
           <span className="eyebrow">
-            Topic · {topicNumber(activeInitial.topicId)}
+            Topic · {topicNumber(topicId)}
             {isResuming && <span className="session-resume-tag"> · resumed</span>}
           </span>
-          <h2 className="session-h2">{activeInitial.topicTitle}</h2>
+          <h2 className="session-h2">{topicTitle}</h2>
         </div>
         <div className="session-actions">
           {mastered ? (
@@ -159,7 +197,7 @@ export function SessionView({ initial, onExit }: SessionViewProps) {
             type="button"
             className="link-restart"
             onClick={() => void handleRestart()}
-            disabled={restarting || sending}
+            disabled={restarting || sending || starting}
             title="이 토픽을 새 세션으로 다시 시작합니다"
           >
             {restarting ? 'starting…' : '새 세션'}
@@ -177,14 +215,17 @@ export function SessionView({ initial, onExit }: SessionViewProps) {
       />
 
       <div className="thread" ref={scrollRef}>
-        {restarting && (
+        {booting && (
           <article className="entry entry-coach entry-restart">
-            <span className="eyebrow entry-tag">Coach · 새 세션 준비 중</span>
+            <span className="eyebrow entry-tag">
+              Coach · {starting ? '세션 준비 중' : '새 세션 준비 중'}
+            </span>
             <div className="entry-body">
               <p className="typing">
-                새 세션을 시작하는 중입니다. claude 와의 첫 인사가 도착할 때까지 10~30초 정도 걸릴 수 있습니다.
+                {starting ? '학습 세션을 준비하는 중입니다.' : '새 세션을 시작하는 중입니다.'}{' '}
+                코치의 첫 안내가 도착할 때까지 10~30초 정도 걸릴 수 있습니다.
               </p>
-              <span className="row-loading" aria-label="시작 중">
+              <span className="row-loading" aria-label="준비 중">
                 <span />
                 <span />
                 <span />
@@ -253,9 +294,11 @@ export function SessionView({ initial, onExit }: SessionViewProps) {
           value={input}
           onChange={(e) => setInput(e.target.value)}
           placeholder={
-            mastered
-              ? '이 토픽은 마스터에 도달했습니다. 더 깊은 후속 질문을 던져도 좋습니다.'
-              : '자기 말로 풀어 설명해 보세요…'
+            booting
+              ? '세션을 준비하는 중입니다…'
+              : mastered
+                ? '이 토픽은 마스터에 도달했습니다. 더 깊은 후속 질문을 던져도 좋습니다.'
+                : '자기 말로 풀어 설명해 보세요…'
           }
           onKeyDown={(e) => {
             if ((e.metaKey || e.ctrlKey) && e.key === 'Enter') {
@@ -263,11 +306,11 @@ export function SessionView({ initial, onExit }: SessionViewProps) {
               void handleSend();
             }
           }}
-          disabled={sending || restarting}
+          disabled={sending || restarting || starting}
         />
         <button
           onClick={() => void handleSend()}
-          disabled={sending || restarting || !input.trim()}
+          disabled={sending || restarting || starting || !input.trim()}
         >
           {sending ? 'Sending' : 'Submit'}
         </button>
