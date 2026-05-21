@@ -22,6 +22,28 @@
 
 ---
 
+## 0.5 Tier 2 — 채점 구조 개편: 개념별 점수 추적 (진행 중)
+
+> 배경: `tasks/prompt-review.md` P2 — 마스터 조건은 "개념별 ≥3" 인데 시스템은 턴당 score
+> 1개만 저장. 개념별 점수가 없어 진척 추적이 LLM 기억에 의존하던 구조적 결함을 해결.
+> 기존 `progress.db` 는 폐기 (clean slate, 마이그레이션 없음).
+
+### Phase 1 — 서버 + DB + 프롬프트 ✅
+- [x] `db.ts` — 스키마 재설계: `sessions`(integration_score) / `concepts`(신규) / `turns`(turn_score·eval_json). `concept_misses` 폐기
+- [x] `prompt.ts` — 시작 멘트에 개념 목록 JSON, 평가 턴에 개념별 점수 JSON. `extractConceptList`·`extractEvaluation` 파서
+- [x] `sessions.ts` — 개념 영속화, 새 Session 모델, `applyEvaluation`
+- [x] `stats.ts` — weak points·topic stats 를 `concepts` 기반으로 재도출
+- [x] `routes.ts` — startSession 개념 파싱·저장, postMessage 개념별 best score 갱신, 마스터를 서버가 계산
+- [x] 검증 — DB 폐기 후 새 세션 API 테스트. 한 답변이 c2·c3 동시 4점, 마스터 서버 계산 확인
+
+### Phase 2 — 프론트엔드
+- [ ] `api.ts` — 응답 타입 갱신
+- [ ] `ScorePanel.tsx` — 개념 체크리스트 (개념명 + 0~5 막대 + 상태 뱃지)
+- [ ] `App.tsx` / `SessionView.tsx` — 인덱스 진척 표시·세션 hydration 연동
+- [ ] 검증 — 브라우저 학습 흐름 확인
+
+---
+
 ## 1. 응답 체감 속도
 
 - [ ] **2.1 SSE 스트리밍** — `claude -p --output-format stream-json` + EventSource. 첫 글자 1~2초. (3~4h)

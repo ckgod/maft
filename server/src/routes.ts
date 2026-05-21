@@ -1,24 +1,33 @@
 import { Router, type RequestHandler } from 'express';
 import { callClaude } from './claude.js';
-import { db } from './db.js';
-import { buildSystemPrompt, extractRubric, withFormatReminder } from './prompt.js';
+import {
+  buildSystemPrompt,
+  extractConceptList,
+  extractEvaluation,
+  stripCoachJson,
+  withEvalReminder,
+  withStartReminder,
+  type Evaluation,
+} from './prompt.js';
 import type { TopicIndex } from './topics.js';
 import {
   appendTurn,
+  applyEvaluation,
   createSession,
   deleteSessionsByTopic,
   getLatestSessionByTopic,
   getSession,
   listSessions,
   updateClaudeSessionId,
-  updateSessionMeta,
 } from './sessions.js';
-import {
-  deleteConceptMissesForTopic,
-  getTopicStatsMap,
-  getWeakPoints,
-  recordMissedConcepts,
-} from './stats.js';
+import { getTopicStatsMap, getWeakPoints } from './stats.js';
+
+/** sparkline 용 대표 점수 — 그 턴 평가에서 가장 높은 점수 (통합 점수 포함). */
+function deriveTurnScore(evaluation: Evaluation): number | null {
+  const scores = evaluation.scores.map((s) => s.score);
+  if (evaluation.integrationScore !== null) scores.push(evaluation.integrationScore);
+  return scores.length > 0 ? Math.max(...scores) : null;
+}
 
 export function createRouter(index: TopicIndex): Router {
   const router = Router();
@@ -36,11 +45,11 @@ export function createRouter(index: TopicIndex): Router {
         stats: s
           ? {
               attempts: s.attempts,
-              bestScore: s.bestScore,
-              lastScore: s.lastScore,
               mastered: s.mastered,
+              bestCleared: s.bestCleared,
+              bestTotal: s.bestTotal,
             }
-          : { attempts: 0, bestScore: null, lastScore: null, mastered: false },
+          : { attempts: 0, mastered: false, bestCleared: 0, bestTotal: 0 },
       };
     });
     const categories = [...index.byId.values()]
@@ -68,23 +77,31 @@ export function createRouter(index: TopicIndex): Router {
 
     try {
       const systemPrompt = buildSystemPrompt(topic);
-      const result = await callClaude({ prompt: '학습 시작', systemPrompt });
+      const result = await callClaude({ prompt: withStartReminder('학습 시작'), systemPrompt });
+
+      const concepts = extractConceptList(result.text);
+      if (!concepts) {
+        console.warn(`[startSession] 개념 목록 JSON 누락 — topic=${topic.id}`);
+      }
 
       const session = createSession({
         id: result.sessionId,
         topicId: topic.id,
         createdAt: Date.now(),
-        initialAssistantText: result.text,
+        initialAssistantText: stripCoachJson(result.text),
         claudeSessionId: result.sessionId,
+        concepts: concepts ?? [],
       });
 
       res.json({
         sessionId: session.id,
         topicId: session.topicId,
         topicTitle: topic.title,
-        message: result.text,
-        rubric: null,
-        mastered: false,
+        message: stripCoachJson(result.text),
+        concepts: session.concepts,
+        integrationScore: session.integrationScore,
+        nextFocus: session.nextFocus,
+        mastered: session.mastered,
       });
     } catch (e) {
       const msg = e instanceof Error ? e.message : String(e);
@@ -118,41 +135,43 @@ export function createRouter(index: TopicIndex): Router {
     try {
       // `--resume` 는 대화 history 만 복원할 뿐 `--system-prompt` 는 보존하지 않습니다.
       // 따라서 매 턴 시스템 프롬프트(파인만 코치 규칙 + 토픽 원문)를 다시 주입해야
-      // 채점 JSON 블록 규칙이 유지됩니다. user 메시지에는 형식 reminder 도 덧붙입니다.
+      // 채점 규칙이 유지됩니다. user 메시지에는 형식 reminder 도 덧붙입니다.
       const result = await callClaude({
-        prompt: withFormatReminder(userMessage),
+        prompt: withEvalReminder(userMessage),
         sessionId: session.claudeSessionId,
         systemPrompt: buildSystemPrompt(topic),
       });
       if (result.sessionId && result.sessionId !== session.claudeSessionId) {
-        // claude 가 새 ID 를 돌려준 경우(예: fork) 우리 DB 의 매핑을 동기화합니다.
         updateClaudeSessionId(session.id, result.sessionId);
       }
-      const rubric = extractRubric(result.text);
+
+      const evaluation = extractEvaluation(result.text);
+      if (!evaluation) {
+        console.warn(`[postMessage] 채점 JSON 누락 — session=${session.id}`);
+      }
+
       const ts = Date.now();
-      appendTurn(session.id, { role: 'user', text: userMessage, rubric: null, ts });
+      appendTurn(session.id, { role: 'user', text: userMessage, turnScore: null, evalJson: null, ts });
       appendTurn(session.id, {
         role: 'assistant',
-        text: result.text,
-        rubric,
+        text: stripCoachJson(result.text),
+        turnScore: evaluation ? deriveTurnScore(evaluation) : null,
+        evalJson: evaluation ? JSON.stringify(evaluation) : null,
         ts: ts + 1,
       });
-      const masteredNow = session.mastered || rubric?.mastered === true;
-      updateSessionMeta(session.id, {
-        updatedAt: ts + 1,
-        lastRubric: rubric ?? undefined,
-        mastered: masteredNow,
-      });
-      if (rubric && rubric.missedConcepts.length > 0) {
-        recordMissedConcepts(session.topicId, rubric.missedConcepts, ts + 1);
-      }
+
+      const updated = evaluation
+        ? applyEvaluation(session.id, evaluation, ts + 1)
+        : (getSession(session.id) ?? session);
 
       res.json({
         sessionId: session.id,
         topicId: session.topicId,
-        message: result.text,
-        rubric,
-        mastered: masteredNow,
+        message: stripCoachJson(result.text),
+        concepts: updated.concepts,
+        integrationScore: updated.integrationScore,
+        nextFocus: updated.nextFocus,
+        mastered: updated.mastered,
       });
     } catch (e) {
       const msg = e instanceof Error ? e.message : String(e);
@@ -175,8 +194,7 @@ export function createRouter(index: TopicIndex): Router {
   };
 
   /**
-   * 토픽의 가장 최근 세션을 hydration 형태(SessionStartResponse + turns) 로 반환합니다.
-   * 클라이언트는 이 응답을 받아 화면을 복원합니다. 직전 세션이 없으면 404.
+   * 토픽의 가장 최근 세션을 hydration 형태로 반환합니다. 직전 세션이 없으면 404.
    */
   const getLastSessionForTopic: RequestHandler = (req, res) => {
     const topicId = req.params.topicId;
@@ -200,7 +218,9 @@ export function createRouter(index: TopicIndex): Router {
       topicId: session.topicId,
       topicTitle: topic.title,
       message: opening?.text ?? '',
-      rubric: opening?.rubric ?? null,
+      concepts: session.concepts,
+      integrationScore: session.integrationScore,
+      nextFocus: session.nextFocus,
       mastered: session.mastered,
       turns: session.history,
     });
@@ -211,10 +231,8 @@ export function createRouter(index: TopicIndex): Router {
   };
 
   /**
-   * 토픽 단위 학습 데이터를 모두 삭제합니다.
-   * - sessions 행 (turns 는 FK CASCADE 로 함께 삭제)
-   * - concept_misses 행
-   * "새 세션" 진입을 깨끗한 상태에서 시작하기 위한 의도적 reset 입니다.
+   * 토픽 단위 학습 데이터를 모두 삭제합니다. sessions 행 삭제 시
+   * concepts·turns 는 FK CASCADE 로 함께 정리됩니다.
    */
   const resetTopicData: RequestHandler = (req, res) => {
     const topicId = req.params.topicId;
@@ -227,12 +245,8 @@ export function createRouter(index: TopicIndex): Router {
       res.status(404).json({ error: 'topic not found', topicId });
       return;
     }
-    const result = db.transaction(() => {
-      const sessions = deleteSessionsByTopic(topicId);
-      const misses = deleteConceptMissesForTopic(topicId);
-      return { sessions, misses };
-    })();
-    res.json({ topicId, deleted: result });
+    const sessions = deleteSessionsByTopic(topicId);
+    res.json({ topicId, deleted: { sessions } });
   };
 
   const listWeakPoints: RequestHandler = (req, res) => {
@@ -242,14 +256,13 @@ export function createRouter(index: TopicIndex): Router {
       const parsed = Number.parseInt(limitRaw, 10);
       if (Number.isFinite(parsed) && parsed > 0) limit = Math.min(parsed, 50);
     }
-    const rows = getWeakPoints(limit);
-    const items = rows.map((r) => {
+    const items = getWeakPoints(limit).map((r) => {
       const topic = index.byId.get(r.topicId);
       return {
         topicId: r.topicId,
         topicTitle: topic?.title ?? r.topicId,
         concept: r.concept,
-        count: r.count,
+        bestScore: r.bestScore,
         lastSeenAt: r.lastSeenAt,
       };
     });
