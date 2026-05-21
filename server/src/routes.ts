@@ -1,7 +1,7 @@
 import { Router, type RequestHandler } from 'express';
 import { callClaude } from './claude.js';
 import { db } from './db.js';
-import { buildSystemPrompt, withFormatReminder, extractRubric } from './prompt.js';
+import { buildSystemPrompt, extractRubric } from './prompt.js';
 import type { TopicIndex } from './topics.js';
 import {
   appendTurn,
@@ -118,7 +118,7 @@ export function createRouter(index: TopicIndex): Router {
       // claude CLI 의 세션 영속성을 사용합니다 (`--resume`).
       // 시스템 프롬프트와 history 는 claude 측이 들고 있으므로 우리는 새 user 메시지만 보냅니다.
       const result = await callClaude({
-        prompt: withFormatReminder(userMessage),
+        prompt: userMessage,
         sessionId: session.claudeSessionId,
       });
       if (result.sessionId && result.sessionId !== session.claudeSessionId) {
