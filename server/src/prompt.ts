@@ -91,6 +91,25 @@ export function buildSystemPrompt(topic: TopicNode): string {
   return FEYNMAN_TEMPLATE.replace('{TOPIC_CONTENT}', content);
 }
 
+/**
+ * 후속 평가 턴마다 user 메시지 끝에 붙이는 출력 형식 reminder.
+ * `--resume` 로 재개된 세션은 시스템 프롬프트 규칙만으로는 마지막 JSON 채점 블록을
+ * 자주 누락합니다(대화 history 가 "JSON 없음" 패턴을 강화하기 때문). 매 턴 reminder 로
+ * 형식을 다시 못 박아 채점 패널이 비는 것을 막습니다.
+ */
+const FORMAT_REMINDER = `
+
+---
+[출력 형식 — 반드시 지킬 것] 위 코칭 응답(잘 짚은 점 · 다음 단계 안내)을 모두 작성한 뒤, 응답 맨 마지막에 아래 형식의 JSON 코드 블록을 반드시 첨부하십시오. 이 블록이 없으면 학습자의 점수 패널이 비어 학습 흐름이 망가집니다. 키는 정확히 \`score\` · \`missed_concepts\` · \`next_focus\` · \`mastered\` 네 개만 사용하고, 키 이름을 변형(복수형 · 카멜케이스 등)하지 마십시오.
+
+\`\`\`json
+{"score": 0, "missed_concepts": [], "next_focus": "", "mastered": false}
+\`\`\``;
+
+export function withFormatReminder(userMessage: string): string {
+  return `${userMessage}${FORMAT_REMINDER}`;
+}
+
 export interface RubricResult {
   score: number;
   missedConcepts: string[];
@@ -98,25 +117,44 @@ export interface RubricResult {
   mastered: boolean;
 }
 
-const RUBRIC_RE = /```json\s*([\s\S]*?)\s*```/i;
+// ```json 펜스를 우선하되, 언어 태그가 빠진 ``` 펜스도 허용합니다.
+const FENCE_RE = /```(?:json)?\s*([\s\S]*?)\s*```/gi;
+// 펜스가 통째로 누락된 경우의 폴백: score 키를 담은 JSON 객체.
+const BARE_OBJECT_RE = /\{[^{}]*"score"[^{}]*\}/g;
 
-export function extractRubric(responseText: string): RubricResult | null {
-  const m = responseText.match(RUBRIC_RE);
-  if (!m || !m[1]) return null;
+function coerceRubric(raw: string): RubricResult | null {
+  let parsed: unknown;
   try {
-    const parsed = JSON.parse(m[1]) as Partial<{
-      score: number;
-      missed_concepts: string[];
-      next_focus: string;
-      mastered: boolean;
-    }>;
-    return {
-      score: typeof parsed.score === 'number' ? parsed.score : 0,
-      missedConcepts: Array.isArray(parsed.missed_concepts) ? parsed.missed_concepts : [],
-      nextFocus: typeof parsed.next_focus === 'string' ? parsed.next_focus : '',
-      mastered: parsed.mastered === true,
-    };
+    parsed = JSON.parse(raw);
   } catch {
     return null;
   }
+  if (typeof parsed !== 'object' || parsed === null) return null;
+  const p = parsed as Partial<{
+    score: number;
+    missed_concepts: string[];
+    next_focus: string;
+    mastered: boolean;
+  }>;
+  // score 가 숫자가 아니면 채점 블록으로 보지 않습니다 (다른 코드 블록 오인 방지).
+  if (typeof p.score !== 'number') return null;
+  return {
+    score: p.score,
+    missedConcepts: Array.isArray(p.missed_concepts) ? p.missed_concepts : [],
+    nextFocus: typeof p.next_focus === 'string' ? p.next_focus : '',
+    mastered: p.mastered === true,
+  };
+}
+
+export function extractRubric(responseText: string): RubricResult | null {
+  // 1) 코드 펜스 — 평가 블록은 응답 맨 끝에 오므로 마지막 펜스부터 검사합니다.
+  const fences = [...responseText.matchAll(FENCE_RE)].map((m) => m[1] ?? '');
+  // 2) 펜스가 누락된 응답의 폴백: score 키를 포함한 raw JSON 객체.
+  const bareObjects = responseText.match(BARE_OBJECT_RE) ?? [];
+  // 펜스를 우선하되, 두 후보군 모두 맨 끝(최신) 쪽부터 검사합니다.
+  for (const candidate of [...fences.reverse(), ...bareObjects.reverse()]) {
+    const r = coerceRubric(candidate);
+    if (r) return r;
+  }
+  return null;
 }

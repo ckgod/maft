@@ -1,7 +1,7 @@
 import { Router, type RequestHandler } from 'express';
 import { callClaude } from './claude.js';
 import { db } from './db.js';
-import { buildSystemPrompt, extractRubric } from './prompt.js';
+import { buildSystemPrompt, extractRubric, withFormatReminder } from './prompt.js';
 import type { TopicIndex } from './topics.js';
 import {
   appendTurn,
@@ -109,17 +109,20 @@ export function createRouter(index: TopicIndex): Router {
       return;
     }
 
-    if (!index.byId.has(session.topicId)) {
+    const topic = index.byId.get(session.topicId);
+    if (!topic) {
       res.status(500).json({ error: 'topic for session not found', topicId: session.topicId });
       return;
     }
 
     try {
-      // claude CLI 의 세션 영속성을 사용합니다 (`--resume`).
-      // 시스템 프롬프트와 history 는 claude 측이 들고 있으므로 우리는 새 user 메시지만 보냅니다.
+      // `--resume` 는 대화 history 만 복원할 뿐 `--system-prompt` 는 보존하지 않습니다.
+      // 따라서 매 턴 시스템 프롬프트(파인만 코치 규칙 + 토픽 원문)를 다시 주입해야
+      // 채점 JSON 블록 규칙이 유지됩니다. user 메시지에는 형식 reminder 도 덧붙입니다.
       const result = await callClaude({
-        prompt: userMessage,
+        prompt: withFormatReminder(userMessage),
         sessionId: session.claudeSessionId,
+        systemPrompt: buildSystemPrompt(topic),
       });
       if (result.sessionId && result.sessionId !== session.claudeSessionId) {
         // claude 가 새 ID 를 돌려준 경우(예: fork) 우리 DB 의 매핑을 동기화합니다.

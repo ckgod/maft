@@ -26,9 +26,12 @@ export async function callClaude(opts: ClaudeCallOptions): Promise<ClaudeResult>
   const model = opts.model ?? DEFAULT_MODEL;
   const args = ['-p', opts.prompt, '--output-format', 'json', '--model', model];
 
+  // `--resume` 와 `--system-prompt` 는 함께 쓸 수 있습니다. `--resume` 는 대화 history 만
+  // 복원하고 시스템 프롬프트는 보존하지 않으므로, 두 옵션을 독립적으로 적용합니다.
   if (opts.sessionId) {
     args.push('--resume', opts.sessionId);
-  } else if (opts.systemPrompt) {
+  }
+  if (opts.systemPrompt) {
     args.push('--system-prompt', opts.systemPrompt);
   }
 
