@@ -88,9 +88,12 @@ export function buildTopicIndex(writersideDir: string): TopicIndex {
     if (m && m[1]) node.title = m[1].trim();
   }
 
-  const questions = [...byId.values()]
-    .filter((n) => n.kind === 'question' || n.kind === 'extra')
-    .sort((a, b) => a.id.localeCompare(b.id, 'ko', { numeric: true }));
+  // mi.tree 등장 순서(= 카테고리 순서 → 카테고리 내 번호 순)를 그대로 보존합니다.
+  // byId 는 트리 순회 순서대로 삽입되고 Map 은 삽입 순서를 유지하므로 별도 정렬이
+  // 불필요합니다. (id 기준 정렬은 extra(E*) 토픽을 앞으로 몰아 카테고리 순서를 깨뜨림)
+  const questions = [...byId.values()].filter(
+    (n) => n.kind === 'question' || n.kind === 'extra',
+  );
 
   return { rootIds, byId, questions };
 }
