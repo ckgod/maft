@@ -20,7 +20,7 @@ export interface ClaudeResult {
   raw: unknown;
 }
 
-const DEFAULT_MODEL = 'claude-sonnet-4-6';
+const DEFAULT_MODEL = 'claude-opus-4-8';
 
 export async function callClaude(opts: ClaudeCallOptions): Promise<ClaudeResult> {
   const model = opts.model ?? DEFAULT_MODEL;
