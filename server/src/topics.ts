@@ -98,3 +98,27 @@ export function buildTopicIndex(writersideDir: string): TopicIndex {
 export function loadTopicContent(node: TopicNode): string {
   return readFileSync(node.filePath, 'utf8');
 }
+
+/** 토픽의 하위(자식·손자) 노드 중 Details 종류만 트리 순서대로 모읍니다. */
+export function collectDetailNodes(index: TopicIndex, topic: TopicNode): TopicNode[] {
+  const out: TopicNode[] = [];
+  const walk = (id: string) => {
+    const node = index.byId.get(id);
+    if (!node) return;
+    if (node.kind === 'detail') out.push(node);
+    for (const childId of node.childrenIds) walk(childId);
+  };
+  for (const childId of topic.childrenIds) walk(childId);
+  return out;
+}
+
+/**
+ * 토픽에 딸린 Details 문서 본문을 제목 구분과 함께 하나의 문자열로 합칩니다.
+ * Details 가 없으면 빈 문자열을 반환합니다. (코치의 심화 배경지식용 — 채점 대상 아님)
+ */
+export function buildDetailContent(index: TopicIndex, topic: TopicNode): string {
+  return collectDetailNodes(index, topic)
+    .filter((d) => existsSync(d.filePath))
+    .map((d) => `### ${d.title}\n\n${readFileSync(d.filePath, 'utf8')}`)
+    .join('\n\n---\n\n');
+}

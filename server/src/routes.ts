@@ -9,7 +9,7 @@ import {
   withStartReminder,
   type Evaluation,
 } from './prompt.js';
-import type { TopicIndex } from './topics.js';
+import { buildDetailContent, type TopicIndex } from './topics.js';
 import {
   appendTurn,
   applyEvaluation,
@@ -79,7 +79,9 @@ export function createRouter(index: TopicIndex): Router {
     }
 
     try {
-      const systemPrompt = buildSystemPrompt(topic);
+      // 심화 참고 자료(Details)는 개념 분해가 일어나는 세션 시작 때만 주입합니다.
+      // 이후 평가 턴(postMessage)에는 넣지 않아 매 턴 입력 토큰을 절감합니다.
+      const systemPrompt = buildSystemPrompt(topic, buildDetailContent(index, topic));
       // 개념 목록 JSON 이 누락되면 세션이 사용 불능(마스터 불가·패널 빈 상태)이 되므로,
       // 누락 시 새 claude 세션으로 한 번 재시도합니다.
       let result = await callClaude({ prompt: withStartReminder('학습 시작'), systemPrompt });
@@ -154,6 +156,7 @@ export function createRouter(index: TopicIndex): Router {
       // `--resume` 는 대화 history 만 복원할 뿐 `--system-prompt` 는 보존하지 않습니다.
       // 따라서 매 턴 시스템 프롬프트(파인만 코치 규칙 + 토픽 원문)를 다시 주입해야
       // 채점 규칙이 유지됩니다. user 메시지에는 형식 reminder 도 덧붙입니다.
+      // 단 Details 심화 자료는 세션 시작 때만 주입했으므로 여기서는 제외합니다(토큰 절감).
       const result = await callClaude({
         prompt: withEvalReminder(userMessage),
         sessionId: session.claudeSessionId,
