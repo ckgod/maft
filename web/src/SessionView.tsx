@@ -56,7 +56,10 @@ function pad2(n: number): string {
   return String(n).padStart(2, '0');
 }
 
-const NARROW_QUERY = '(max-width: 920px)';
+// 가로가 좁거나(태블릿/모바일) 세로가 짧으면(노트북) CONCEPTS 패널을
+// 접을 수 있게 한다. 세로 짧은 화면에서는 패널이 대화 영역을 크게 잠식하므로
+// 기본 접힘으로 진입해 thread 공간을 확보한다.
+const NARROW_QUERY = '(max-width: 920px), (max-height: 820px)';
 
 function readInitialNarrow(): boolean {
   if (typeof window === 'undefined') return false;
