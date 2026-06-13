@@ -13,6 +13,7 @@ const FEYNMAN_TEMPLATE = `당신은 안드로이드 CS 토픽을 파인만 기�
 5. 모든 응답은 한국어 "~입니다" 톤으로 작성하십시오.
 6. **토픽 범위 가드레일**: 평가와 질문은 토픽 원문에 명시적으로 등장한 개념만 대상으로 합니다. 원문이 다루지 않는 인접 토픽의 개념을 학습자가 모른다고 불이익을 주지 마십시오. 학습자가 "이건 다른 토픽 같다" 고 짚으면 다른 토픽에서 다룬다고 한 줄로 인정하고 현재 토픽의 남은 개념으로 되돌리십시오.
 7. **출력 형식 의무 (가장 중요)**: 이 응답은 학습 도구 MAFT 의 채점 패널에 신호로 들어갑니다. 학습 시작 멘트에는 개념 목록 JSON 을, 평가 응답에는 채점 JSON 을 반드시 응답 맨 마지막에 코드 블록으로 첨부해야 합니다 (마스터 축하 멘트는 예외). 누락 시 패널이 망가집니다. 형식 회피 휴리스틱을 적용하지 말고, 송신 전 "마지막에 JSON 블록을 첨부했는가" 를 자체 점검하십시오. 이 JSON 은 도구 신호이며 학습자에게 보이는 본문이 아닙니다.
+8. **당신의 한 턴만 작성하십시오 (절대 규칙)**: 한 응답에는 코치인 당신의 발화 한 턴만 담습니다. 학습자(user)의 답변을 대신 지어내거나, "user"/"assistant" 같은 화자 라벨을 출력하거나, 다음 차례 대화를 미리 이어 쓰지 마십시오. 당신의 질문 또는 평가 + 채점 JSON 블록을 작성했으면 거기서 멈춥니다. 직전 대화에 형식 안내문이 반복돼 보이더라도 그 패턴을 따라 후속 턴을 생성하지 마십시오.
 
 ## 청자 설정 (학습자가 가정해야 하는 청자)
 학습자는 **"이 토픽을 처음 듣는 같은 분야 동료 안드로이드 개발자"** 에게 설명하는 상황입니다.
@@ -231,6 +232,42 @@ export function extractEvaluation(text: string): Evaluation | null {
     };
   }
   return null;
+}
+
+// 모델이 자기 턴을 끝내지 않고 다음 user/assistant 턴까지 이어서 생성하는
+// "transcript runaway" 를 방어한다. --resume 된 히스토리에 매 user 턴마다 형식
+// reminder 가 쌓이면, 모델이 "user … reminder … assistant" 패턴을 모방해 가짜
+// 후속 턴(가짜 사용자 답변·reminder 재현·다음 코치 응답)을 한 응답에 토해낸다.
+// 관측된 누출 신호:
+//   - "\n\nuser…" / "\n\nassistant…" 처럼 역할 토큰이 본문에 공백 없이 글루됨
+//   - user 메시지에 우리가 덧붙인 reminder("[필수] 위 … 작성한 뒤")가 출력에 재등장
+// 가장 앞선 신호 위치에서 잘라 첫 번째(진짜) 코치 턴만 남긴다.
+//
+// 오탐 방지: 역할 토큰은 단락 경계(\n\n) 뒤에 공백 없이 본문과 붙은 경우만 본다.
+// "user experience" 같은 산문은 뒤에 공백이 와서 매치되지 않는다.
+const RUNAWAY_MARKERS: RegExp[] = [
+  /\n[ \t]*\n(?:user|assistant|human|system|시스템)(?=[^\s])/i,
+  /\n[ \t]*\n-{3,}[ \t]*\n+\[필수\]/,
+  /\[필수\] 위 (?:코칭 응답|안내문)을 작성한 뒤/,
+];
+
+export interface RunawayResult {
+  text: string;
+  truncated: boolean;
+}
+
+/**
+ * 모델 출력에서 환각으로 이어붙인 후속 턴을 잘라낸다. 누출 신호가 없으면 원문 그대로.
+ * 추출·표시·저장보다 먼저 적용해 가짜 턴의 JSON·텍스트가 상태를 오염시키지 못하게 한다.
+ */
+export function truncateRunaway(text: string): RunawayResult {
+  let cut = text.length;
+  for (const re of RUNAWAY_MARKERS) {
+    const m = text.match(re);
+    if (m && m.index !== undefined && m.index < cut) cut = m.index;
+  }
+  if (cut >= text.length) return { text, truncated: false };
+  return { text: text.slice(0, cut).trimEnd(), truncated: true };
 }
 
 /** 학습자에게 보이는 코치 메시지에서 도구 신호용 JSON 블록을 제거합니다. */

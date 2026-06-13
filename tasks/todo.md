@@ -133,3 +133,32 @@
 1. **2.1 SSE 스트리밍** — 매 답변마다 10~30초 멍하니 기다리는 게 가장 큰 마찰입니다.
 2. **5.1 markdown archive** + **5.3 진척도 대시보드** — 공부 흔적이 가시화되는 즐거움.
 3. **3.1 Spaced Repetition** — 일주일 뒤 자기 자신을 위한 시스템.
+
+---
+
+## 2026-06-13 · ScorePanel 사이드 레일 재배치
+
+학습 세션에서 Concepts 점수판이 thread 위에 가로 띠로 얹혀 대화를 잠식하던 문제 해결.
+접기/펼치기로는 못 풀던 근본 원인 = 세로 스택 배치였음.
+
+- 진단: `.session` flex column 안에서 ScorePanel 이 header 와 thread 사이에 `flex-shrink:0` 가로 블록으로 끼어, 펼치면 개념 수만큼 thread 높이를 점유.
+- 개선(레퍼런스: Copilot/Cursor/Claude Artifacts 의 우측 on-demand 패널 패턴): 세로 스택 → `.session-body` 가로 그리드(`1fr 288px`). 데스크탑은 우측 상주 레일, ≤920px 는 우측 slide drawer + backdrop + header 토글(`CONCEPTS n/m`).
+- narrow 판정에서 `max-height` 제거 — 우측 레일은 세로를 잠식하지 않으므로 높이 짧은 노트북도 레일로 충분.
+- 버그 잡음: `index.css` 의 진입 애니메이션 `rise-fade`(transform, `both` fill)가 `.rubric-figure` 에 걸려 drawer 의 `translateX(100%)` 를 덮어써 닫힌 drawer 가 화면에 잔존 → `.rubric-figure.rubric-drawer { animation:none }` 로 차단.
+- 검증: tsc/vite build 통과, Playwright 로 데스크탑(레일 우측 비겹침) · narrow 닫힘(off-screen) · 열림(slide+backdrop) 좌표/스크린샷 확인, 콘솔 에러 0.
+- 수정 파일: web/src/SessionView.tsx, web/src/ScorePanel.tsx, web/src/App.css
+
+---
+
+## 2026-06-13 · 코치 응답 transcript runaway 방어
+
+E6-Coroutine-Cancellation 세션에서 코치 응답이 "예상 답변까지 질문으로 표시"되던 문제.
+
+- 진단: 턴 194부터 코치 응답(`result.text`)에 모델이 자기 턴을 넘어 **다음 턴들까지 환각 생성**한 내용이 섞임 — `[진짜 코치] → \n\nuser[가짜 답변] → [필수] reminder 재현 → \n\nassistant[가짜 다음 응답]`. 길이 1003→1863→2552로 폭주. 매 user 메시지에 붙는 형식 reminder가 resume 히스토리에 쌓여 모델이 "user…reminder…assistant" 패턴을 모방한 것이 트리거. 턴 196의 가짜 user 답변 때문에 실제 사용자 답변과 desync 발생.
+- 방어:
+  1. `prompt.ts` `truncateRunaway()` — 출력에서 첫 환각 경계(글루된 user/assistant 역할 토큰, 출력에 재등장한 reminder)를 찾아 진짜 코치 턴만 남김. 산문 속 "user experience"는 오탐 안 함(공백 뒤따름).
+  2. `routes.ts` startSession·postMessage — extract/strip/저장보다 **먼저** truncateRunaway 적용 → 환각 JSON이 점수·마스터·표시를 오염시키지 못함. truncated 시 warn 로그.
+  3. `prompt.ts` 시스템 프롬프트 규칙 8 추가 — "당신의 한 턴만 작성, 다음 차례 생성 금지" (트리거 자체 억제, 방어 심층화).
+- 기존 오염 데이터: turns 194/196/198 표시 텍스트 정리(점수/eval_json은 보존). DB 백업 `server/data/progress.db.bak-20260613-210304`.
+- 테스트: `server/scripts/verify-runaway.ts` (`npm run test:runaway`) — 누출 패턴 임베드 5케이스 전부 통과. tsc 통과, 서버 정상.
+- 한계: claude CLI 내부 --resume 히스토리는 우리가 못 고치므로 이 세션을 계속하면 runaway가 또 날 수 있음(이제 잘려서 표시는 정상이나 그 턴 점수는 미반영). 완전히 깨끗한 진행은 "새 세션" 권장.

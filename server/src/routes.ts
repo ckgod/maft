@@ -5,6 +5,7 @@ import {
   extractConceptList,
   extractEvaluation,
   stripCoachJson,
+  truncateRunaway,
   withEvalReminder,
   withStartReminder,
   type Evaluation,
@@ -85,21 +86,27 @@ export function createRouter(index: TopicIndex): Router {
       // 개념 목록 JSON 이 누락되면 세션이 사용 불능(마스터 불가·패널 빈 상태)이 되므로,
       // 누락 시 새 claude 세션으로 한 번 재시도합니다.
       let result = await callClaude({ prompt: withStartReminder('학습 시작'), systemPrompt });
-      let concepts = extractConceptList(result.text);
+      let clean = truncateRunaway(result.text);
+      let concepts = extractConceptList(clean.text);
       if (!concepts) {
         console.warn(`[startSession] 개념 목록 JSON 누락 — 재시도. topic=${topic.id}`);
         result = await callClaude({ prompt: withStartReminder('학습 시작'), systemPrompt });
-        concepts = extractConceptList(result.text);
+        clean = truncateRunaway(result.text);
+        concepts = extractConceptList(clean.text);
+      }
+      if (clean.truncated) {
+        console.warn(`[startSession] transcript runaway 감지 — 잘라냄. topic=${topic.id}`);
       }
       if (!concepts) {
         console.error(`[startSession] 재시도 후에도 개념 목록 누락 — topic=${topic.id}`);
       }
 
+      const coachMessage = stripCoachJson(clean.text);
       const session = createSession({
         id: result.sessionId,
         topicId: topic.id,
         createdAt: Date.now(),
-        initialAssistantText: stripCoachJson(result.text),
+        initialAssistantText: coachMessage,
         claudeSessionId: result.sessionId,
         concepts: concepts ?? [],
       });
@@ -108,7 +115,7 @@ export function createRouter(index: TopicIndex): Router {
         sessionId: session.id,
         topicId: session.topicId,
         topicTitle: topic.title,
-        message: stripCoachJson(result.text),
+        message: coachMessage,
         concepts: session.concepts,
         integrationScore: session.integrationScore,
         nextFocus: session.nextFocus,
@@ -166,7 +173,15 @@ export function createRouter(index: TopicIndex): Router {
         updateClaudeSessionId(session.id, result.sessionId);
       }
 
-      const evaluation = extractEvaluation(result.text);
+      // 추출·저장보다 먼저 runaway 를 잘라 가짜 후속 턴의 JSON·텍스트가
+      // 점수·마스터·표시를 오염시키지 못하게 한다.
+      const clean = truncateRunaway(result.text);
+      if (clean.truncated) {
+        console.warn(`[postMessage] transcript runaway 감지 — 잘라냄. session=${session.id}`);
+      }
+      const coachMessage = stripCoachJson(clean.text);
+
+      const evaluation = extractEvaluation(clean.text);
       if (!evaluation) {
         console.warn(`[postMessage] 채점 JSON 누락 — session=${session.id}`);
       }
@@ -175,7 +190,7 @@ export function createRouter(index: TopicIndex): Router {
       appendTurn(session.id, { role: 'user', text: userMessage, turnScore: null, evalJson: null, ts });
       appendTurn(session.id, {
         role: 'assistant',
-        text: stripCoachJson(result.text),
+        text: coachMessage,
         turnScore: evaluation ? deriveTurnScore(evaluation) : null,
         evalJson: evaluation ? JSON.stringify(evaluation) : null,
         ts: ts + 1,
@@ -188,7 +203,7 @@ export function createRouter(index: TopicIndex): Router {
       res.json({
         sessionId: session.id,
         topicId: session.topicId,
-        message: stripCoachJson(result.text),
+        message: coachMessage,
         concepts: updated.concepts,
         integrationScore: updated.integrationScore,
         nextFocus: updated.nextFocus,
