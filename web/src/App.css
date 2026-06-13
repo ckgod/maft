@@ -575,6 +575,35 @@
   min-height: 0;
 }
 
+/* 본문: 좌측 thread(가변) + 우측 Concepts 레일(고정폭). 데스크탑 기본. */
+.session-body {
+  flex: 1;
+  min-height: 0;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 288px;
+  gap: 32px;
+  align-items: stretch;
+}
+
+/* drawer 가 열렸을 때 뒤를 덮는 backdrop (좁은 화면 전용) */
+.session-backdrop {
+  position: fixed;
+  inset: 0;
+  background: rgba(8, 10, 14, 0.5);
+  backdrop-filter: blur(1px);
+  z-index: 39;
+  animation: backdrop-in 0.2s var(--ease-out);
+}
+
+@keyframes backdrop-in {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
 .session-head {
   display: grid;
   grid-template-columns: auto 1fr auto;
@@ -671,6 +700,31 @@
   cursor: wait;
 }
 
+/* 좁은 화면에서만 노출되는 Concepts drawer 토글 (데스크탑은 레일 상주) */
+.link-concepts {
+  background: transparent;
+  border: 1px solid var(--rule);
+  padding: 6px 12px;
+  color: var(--ink-3);
+  font-family: var(--font-mono);
+  font-size: var(--tt-xs);
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  cursor: pointer;
+  font-variant-numeric: tabular-nums;
+  transition:
+    color 0.16s var(--ease-out),
+    border-color 0.16s var(--ease-out),
+    background 0.16s var(--ease-out);
+}
+
+.link-concepts:hover,
+.link-concepts[aria-expanded='true'] {
+  color: var(--blueprint);
+  border-color: var(--blueprint);
+  background: var(--blueprint-soft);
+}
+
 .session-resume-tag {
   color: var(--blueprint);
   letter-spacing: 0.14em;
@@ -680,6 +734,7 @@
 
 .thread {
   flex: 1;
+  min-height: 0;
   overflow-y: auto;
   padding: 8px 4px 28px 0;
   display: flex;
@@ -986,9 +1041,23 @@
   flex-direction: column;
   gap: 14px;
   background: var(--paper-1);
-  /* 앱 셸: 헤더·패널·입력창은 고정, thread 만 가변·스크롤 영역으로 둔다.
-     (현 콘텐츠는 min-content 라 실측 차이는 없으나 레이아웃 의도를 명시) */
-  flex-shrink: 0;
+}
+
+/* 데스크탑: thread 우측에 상주하는 사이드 레일.
+   thread 의 세로 높이를 잠식하지 않고, 개념이 많으면 레일 안에서 스크롤한다. */
+.rubric-rail {
+  align-self: start;
+  max-height: 100%;
+  overflow-y: auto;
+  scrollbar-width: thin;
+  scrollbar-color: var(--rule) transparent;
+}
+
+.rubric-rail::-webkit-scrollbar {
+  width: 4px;
+}
+.rubric-rail::-webkit-scrollbar-thumb {
+  background: var(--rule);
 }
 
 /* corner ticks like a chart frame */
@@ -1052,44 +1121,38 @@
   border-color: var(--blueprint);
 }
 
-/* Compact summary row used while panel is collapsed on narrow viewports */
-
-.rubric-summary {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 6px 18px;
-  padding-top: 4px;
+/* 좁은 화면: 우측에서 슬라이드되는 drawer. 기본은 화면 밖(닫힘). */
+.rubric-drawer {
+  position: fixed;
+  top: 0;
+  right: 0;
+  bottom: 0;
+  width: min(340px, 88vw);
+  z-index: 40;
+  border: none;
+  border-left: 1px solid var(--rule);
+  padding: 20px 20px 24px;
+  overflow-y: auto;
+  transform: translateX(100%);
+  transition: transform 0.26s var(--ease-out);
+  box-shadow: -24px 0 48px -24px rgba(0, 0, 0, 0.6);
 }
 
-.rubric-summary-item {
-  display: inline-flex;
-  align-items: baseline;
-  gap: 6px;
-  font-family: var(--font-mono);
-  font-size: var(--tt-xs);
-  color: var(--ink-3);
-  letter-spacing: 0.06em;
+/* 진입 애니메이션(rise-fade)은 transform 을 건드려 drawer 의 translateX 슬라이드를
+   덮어쓴다. drawer 모드에서는 꺼서 슬라이드 transition 만 살린다.
+   (.rubric-figure 단일 선택자보다 높은 우선순위로 prefers-reduced-motion 규칙을 이긴다.) */
+.rubric-figure.rubric-drawer {
+  animation: none;
 }
 
-.rubric-summary-label {
-  text-transform: uppercase;
-  letter-spacing: 0.12em;
-  color: var(--ink-4);
+.rubric-drawer.is-open {
+  transform: translateX(0);
 }
 
-.rubric-summary-item b {
-  font-family: var(--font-display);
-  font-weight: 600;
-  font-size: var(--tt-m);
-  color: var(--ink);
-  letter-spacing: -0.01em;
-  font-variant-numeric: tabular-nums;
-  line-height: 1;
-}
-
-.rubric-figure.is-collapsed {
-  gap: 8px;
-  padding: 12px 18px 12px;
+/* drawer 모드에서는 chart frame 코너 틱이 어색하므로 끈다 */
+.rubric-drawer::before,
+.rubric-drawer::after {
+  display: none;
 }
 
 .rubric-grid {
@@ -1334,9 +1397,13 @@
     text-overflow: ellipsis;
   }
 
-  /* Session view — 노트북에서 thread 공간 확보 */
+  /* Session view — 좁은 화면: 단일 컬럼 + Concepts 는 drawer 로 */
   .app-session {
     padding: 20px 20px 24px;
+  }
+  .session-body {
+    grid-template-columns: 1fr;
+    gap: 0;
   }
   .session-head {
     grid-template-columns: auto 1fr auto;
@@ -1363,12 +1430,14 @@
   flex-direction: column;
 }
 
+/* 2줄 레이아웃: 이름은 전체폭(가변 길이 흡수), 그 아래 미터·점수·상태를
+   고정 그리드로 둬 모든 행에서 동일 x 에 정렬한다. 좁은 레일에서 이름과
+   지표를 한 줄에 욱여넣으면 긴 토픽명이 지표 위치를 흔들어 정렬이 깨진다. */
 .concept-row {
-  display: grid;
-  grid-template-columns: 1fr auto auto 76px;
-  gap: 6px 14px;
-  align-items: center;
-  padding: 9px 0;
+  display: flex;
+  flex-direction: column;
+  gap: 7px;
+  padding: 10px 0;
   border-top: 1px dashed var(--rule);
 }
 
@@ -1381,6 +1450,16 @@
   font-size: var(--tt-s);
   color: var(--ink);
   line-height: 1.4;
+  /* 한글은 어절(공백) 단위로 끊고, 긴 라틴 토큰은 마지막 수단으로 강제 줄바꿈 */
+  word-break: keep-all;
+  overflow-wrap: anywhere;
+}
+
+.concept-metrics {
+  display: grid;
+  grid-template-columns: 77px auto 1fr;
+  align-items: center;
+  gap: 12px;
 }
 
 .concept-row.is-pending .concept-name {

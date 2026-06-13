@@ -56,10 +56,11 @@ function pad2(n: number): string {
   return String(n).padStart(2, '0');
 }
 
-// 가로가 좁거나(태블릿/모바일) 세로가 짧으면(노트북) CONCEPTS 패널을
-// 접을 수 있게 한다. 세로 짧은 화면에서는 패널이 대화 영역을 크게 잠식하므로
-// 기본 접힘으로 진입해 thread 공간을 확보한다.
-const NARROW_QUERY = '(max-width: 920px), (max-height: 820px)';
+// CONCEPTS 패널은 데스크탑에선 thread 우측에 상주하는 사이드 레일이다.
+// 가로가 좁으면(태블릿/모바일) 레일을 띄울 공간이 없으므로, 우측에서
+// 슬라이드되는 drawer 로 전환한다. 우측 레일은 thread 의 세로 높이를 전혀
+// 잠식하지 않으므로 (이전과 달리) 세로 길이(max-height) 는 판정에서 뺀다.
+const NARROW_QUERY = '(max-width: 920px)';
 
 function readInitialNarrow(): boolean {
   if (typeof window === 'undefined') return false;
@@ -177,6 +178,10 @@ export function SessionView({ initial, onExit }: SessionViewProps) {
   let userTurn = 0;
   let coachTurn = 0;
 
+  // 좁은 화면 drawer 토글 버튼에 진척을 요약해 보여준다 (ScorePanel 과 동일 임계값).
+  const clearedCount = concepts.filter((c) => c.bestScore >= 3).length;
+  const hasConcepts = concepts.length > 0;
+
   return (
     <div className="session">
       <header className="session-head">
@@ -191,6 +196,17 @@ export function SessionView({ initial, onExit }: SessionViewProps) {
           <h2 className="session-h2">{topicTitle}</h2>
         </div>
         <div className="session-actions">
+          {isNarrow && hasConcepts && (
+            <button
+              type="button"
+              className="link-concepts"
+              onClick={() => setPanelOpen((o) => !o)}
+              aria-expanded={panelOpen}
+              title="개념 점수판 열기/닫기"
+            >
+              Concepts {clearedCount}/{concepts.length}
+            </button>
+          )}
           {mastered ? (
             <span className="mastered-pill">Mastered</span>
           ) : (
@@ -208,16 +224,8 @@ export function SessionView({ initial, onExit }: SessionViewProps) {
         </div>
       </header>
 
-      <ScorePanel
-        concepts={concepts}
-        integrationScore={integrationScore}
-        mastered={mastered}
-        collapsible={isNarrow}
-        open={panelOpen}
-        onToggle={() => setPanelOpen((o) => !o)}
-      />
-
-      <div className="thread" ref={scrollRef}>
+      <div className="session-body">
+        <div className="thread" ref={scrollRef}>
         {booting && (
           <article className="entry entry-coach entry-restart">
             <span className="eyebrow entry-tag">
@@ -279,7 +287,25 @@ export function SessionView({ initial, onExit }: SessionViewProps) {
             </div>
           </article>
         )}
+        </div>
+
+        <ScorePanel
+          concepts={concepts}
+          integrationScore={integrationScore}
+          mastered={mastered}
+          drawer={isNarrow}
+          open={panelOpen}
+          onClose={() => setPanelOpen(false)}
+        />
       </div>
+
+      {isNarrow && panelOpen && hasConcepts && (
+        <div
+          className="session-backdrop"
+          role="presentation"
+          onClick={() => setPanelOpen(false)}
+        />
+      )}
 
       {error && (
         <div className="status status-error">
