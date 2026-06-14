@@ -7,7 +7,7 @@
 
 ## 기획 의도
 
-[skydoves/manifest-android-interview](https://github.com/skydoves/manifest-android-interview) 의 안드로이드 CS 토픽 약 109개를 그저 읽고 흘려보내는 대신,
+[ckgod/ManifestAndroid](https://github.com/ckgod/ManifestAndroid) 의 안드로이드 CS 토픽을 그저 읽고 흘려보내는 대신,
 **파인만 학습 기법**(자기 설명 → 평가 → 빈틈 역질문 → 재학습) 을 인터랙티브로 구현해 이해도가 일정 수준에 도달할 때까지 가르쳐 주는 학습 도구입니다.
 
 학습자가 토픽을 자기 말로 풀어내면, AI 코치가 토픽 원문을 기준으로 채점하고 학습자가 빠뜨린 핵심 개념을 가리키는 역질문을 돌려줍니다.
