@@ -1497,10 +1497,23 @@
     justify-items: start;
     padding: 10px 4px 6px;
   }
+  /* 챕터는 가로 스크롤 대신 여러 줄로 감싸서 한눈에 보이게 합니다. */
   .nav-sections {
     margin-left: 0;
     padding-left: 0;
     border-left: none;
+    flex-wrap: wrap;
+    overflow-x: visible;
+    gap: 6px;
+  }
+  .nav-sections .nav-item {
+    border: 1px solid var(--rule);
+    border-radius: 999px;
+    padding: 5px 11px;
+  }
+  .nav-sections .nav-item.is-active {
+    border-color: var(--blueprint);
+    background: var(--blueprint-soft);
   }
   .group-book {
     margin-top: 28px;

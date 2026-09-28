@@ -2,10 +2,8 @@ import { useEffect, useMemo, useState } from 'react';
 import {
   getLastSessionForTopic,
   listTopics,
-  listWeakPoints,
   type Category,
   type Topic,
-  type WeakPoint,
 } from './api';
 import { SessionView, type SessionInit } from './SessionView';
 import './App.css';
@@ -74,7 +72,6 @@ export default function App() {
   const [activeCat, setActiveCat] = useState<string | null>(null);
   const [mode, setMode] = useState<AppMode>({ kind: 'list' });
   const [startError, setStartError] = useState<string | null>(null);
-  const [weakPoints, setWeakPoints] = useState<WeakPoint[]>([]);
 
   function loadTopics() {
     listTopics()
@@ -85,17 +82,8 @@ export default function App() {
       .catch((e) => setTopicsError(e instanceof Error ? e.message : String(e)));
   }
 
-  function loadWeakPoints() {
-    listWeakPoints(8)
-      .then((res) => setWeakPoints(res.weakPoints))
-      .catch(() => {
-        // weak points are best-effort, ignore failures
-      });
-  }
-
   useEffect(() => {
     loadTopics();
-    loadWeakPoints();
   }, []);
 
   const catById = useMemo(() => new Map(categories.map((c) => [c.id, c])), [categories]);
@@ -223,7 +211,6 @@ export default function App() {
           onExit={() => {
             setMode({ kind: 'list' });
             loadTopics();
-            loadWeakPoints();
           }}
         />
       </div>
@@ -280,23 +267,6 @@ export default function App() {
           ))}
         </nav>
 
-        {weakPoints.length > 0 && (
-          <section className="sidebar-weakpoints">
-            <span className="eyebrow nav-section-label">// weak points</span>
-            <ul className="weak-list">
-              {weakPoints.map((w) => (
-                <li
-                  key={`${w.topicId}::${w.concept}`}
-                  className="weak-item"
-                  title={`${w.topicTitle} · best ${w.bestScore}/5`}
-                >
-                  <span className="weak-count">{w.bestScore}/5</span>
-                  <span className="weak-concept">{w.concept}</span>
-                </li>
-              ))}
-            </ul>
-          </section>
-        )}
       </aside>
 
       <main className="main-area">
