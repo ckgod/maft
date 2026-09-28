@@ -20,7 +20,8 @@ export interface ClaudeResult {
   raw: unknown;
 }
 
-const DEFAULT_MODEL = 'claude-opus-4-8';
+// 채점·코칭 모델. MAFT_MODEL 환경변수로 코드 수정 없이 바꿔 비교할 수 있습니다.
+const DEFAULT_MODEL = process.env.MAFT_MODEL ?? 'claude-opus-5-5';
 
 export async function callClaude(opts: ClaudeCallOptions): Promise<ClaudeResult> {
   const model = opts.model ?? DEFAULT_MODEL;

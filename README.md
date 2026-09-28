@@ -161,6 +161,7 @@ open http://localhost:5173
 | `MANIFEST_WRITERSIDE_DIR` | `../../ManifestAndroid/Writerside` | 토픽 콘텐츠 루트 |
 | `MAFT_DB_PATH` | `server/data/progress.db` | SQLite 진행 상황 DB |
 | `PORT` | `3001` | 서버 포트 |
+| `MAFT_MODEL` | `claude-opus-5-5` | 코치(개념 추출·채점) 모델. 코드 수정 없이 모델을 바꿔 비교할 때 사용합니다 |
 | `ANTHROPIC_API_KEY` | (미설정 권장) | 설정 시 OAuth 대신 API 키로 동작해 사용량 과금이 발생합니다. **MAFT 의 의도와 어긋나므로 unset 을 권장합니다** |
 
 ## 핵심 설계 결정
