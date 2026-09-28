@@ -2,15 +2,38 @@ import { Router, type RequestHandler } from 'express';
 import { callClaude } from './claude.js';
 import {
   buildSystemPrompt,
+  conceptsFromStructured,
+  evaluationFromStructured,
   extractConceptList,
   extractEvaluation,
+  EVAL_SCHEMA,
+  START_SCHEMA,
   stripCoachJson,
   truncateRunaway,
-  withEvalReminder,
-  withStartReminder,
+  type ConceptSpec,
   type Evaluation,
 } from './prompt.js';
-import { buildDetailContent, type TopicIndex } from './topics.js';
+import { buildDetailContent, topicBook, type TopicIndex } from './topics.js';
+import type { ClaudeResult } from './claude.js';
+
+/**
+ * 학습 시작 응답을 해석합니다. 구조화 출력을 우선하고, 없으면 본문의 JSON 블록을 찾습니다.
+ * 본문 폴백은 구조화 출력이 실패했거나 예전 방식으로 만들어진 응답을 위한 것입니다.
+ */
+function readStart(result: ClaudeResult): { message: string; concepts: ConceptSpec[] | null } {
+  const structured = conceptsFromStructured(result.structuredOutput);
+  if (structured) return { message: truncateRunaway(structured.message).text, concepts: structured.concepts };
+  const clean = truncateRunaway(result.text);
+  return { message: stripCoachJson(clean.text), concepts: extractConceptList(clean.text) };
+}
+
+/** 평가 턴 응답을 해석합니다. readStart 와 같은 순서로 폴백합니다. */
+function readEvaluation(result: ClaudeResult): { message: string; evaluation: Evaluation | null } {
+  const structured = evaluationFromStructured(result.structuredOutput);
+  if (structured) return { message: truncateRunaway(structured.message).text, evaluation: structured.evaluation };
+  const clean = truncateRunaway(result.text);
+  return { message: stripCoachJson(clean.text), evaluation: extractEvaluation(clean.text) };
+}
 import {
   appendTurn,
   applyEvaluation,
@@ -82,26 +105,25 @@ export function createRouter(index: TopicIndex): Router {
     try {
       // 심화 참고 자료(Details)는 개념 분해가 일어나는 세션 시작 때만 주입합니다.
       // 이후 평가 턴(postMessage)에는 넣지 않아 매 턴 입력 토큰을 절감합니다.
-      const systemPrompt = buildSystemPrompt(topic, buildDetailContent(index, topic));
-      // 개념 목록 JSON 이 누락되면 세션이 사용 불능(마스터 불가·패널 빈 상태)이 되므로,
-      // 누락 시 새 claude 세션으로 한 번 재시도합니다.
-      let result = await callClaude({ prompt: withStartReminder('학습 시작'), systemPrompt });
-      let clean = truncateRunaway(result.text);
-      let concepts = extractConceptList(clean.text);
-      if (!concepts) {
-        console.warn(`[startSession] 개념 목록 JSON 누락 — 재시도. topic=${topic.id}`);
-        result = await callClaude({ prompt: withStartReminder('학습 시작'), systemPrompt });
-        clean = truncateRunaway(result.text);
-        concepts = extractConceptList(clean.text);
+      const systemPrompt = buildSystemPrompt(
+        topic,
+        topicBook(index, topic),
+        buildDetailContent(index, topic),
+      );
+      // 개념 목록이 없으면 세션이 사용 불능(마스터 불가·패널 빈 상태)이 되므로 한 번 재시도합니다.
+      let result = await callClaude({ prompt: '학습 시작', systemPrompt, jsonSchema: START_SCHEMA });
+      let parsed = readStart(result);
+      if (!parsed.concepts) {
+        console.warn(`[startSession] 개념 목록 누락 — 재시도. topic=${topic.id}`);
+        result = await callClaude({ prompt: '학습 시작', systemPrompt, jsonSchema: START_SCHEMA });
+        parsed = readStart(result);
       }
-      if (clean.truncated) {
-        console.warn(`[startSession] transcript runaway 감지 — 잘라냄. topic=${topic.id}`);
-      }
-      if (!concepts) {
+      if (!parsed.concepts) {
         console.error(`[startSession] 재시도 후에도 개념 목록 누락 — topic=${topic.id}`);
       }
+      const concepts = parsed.concepts;
+      const coachMessage = parsed.message;
 
-      const coachMessage = stripCoachJson(clean.text);
       const session = createSession({
         id: result.sessionId,
         topicId: topic.id,
@@ -160,30 +182,21 @@ export function createRouter(index: TopicIndex): Router {
     inFlightSessions.add(session.id);
 
     try {
-      // `--resume` 는 대화 history 만 복원할 뿐 `--system-prompt` 는 보존하지 않습니다.
-      // 따라서 매 턴 시스템 프롬프트(파인만 코치 규칙 + 토픽 원문)를 다시 주입해야
-      // 채점 규칙이 유지됩니다. user 메시지에는 형식 reminder 도 덧붙입니다.
-      // 단 Details 심화 자료는 세션 시작 때만 주입했으므로 여기서는 제외합니다(토큰 절감).
+      // `--resume` 는 대화 history 만 복원할 뿐 `--system-prompt` 는 보존하지 않으므로
+      // 매 턴 시스템 프롬프트를 다시 넣습니다. Details 심화 자료는 세션 시작 때만 넣습니다(토큰 절감).
       const result = await callClaude({
-        prompt: withEvalReminder(userMessage),
+        prompt: userMessage,
         sessionId: session.claudeSessionId,
-        systemPrompt: buildSystemPrompt(topic),
+        systemPrompt: buildSystemPrompt(topic, topicBook(index, topic)),
+        jsonSchema: EVAL_SCHEMA,
       });
       if (result.sessionId && result.sessionId !== session.claudeSessionId) {
         updateClaudeSessionId(session.id, result.sessionId);
       }
 
-      // 추출·저장보다 먼저 runaway 를 잘라 가짜 후속 턴의 JSON·텍스트가
-      // 점수·마스터·표시를 오염시키지 못하게 한다.
-      const clean = truncateRunaway(result.text);
-      if (clean.truncated) {
-        console.warn(`[postMessage] transcript runaway 감지 — 잘라냄. session=${session.id}`);
-      }
-      const coachMessage = stripCoachJson(clean.text);
-
-      const evaluation = extractEvaluation(clean.text);
+      const { message: coachMessage, evaluation } = readEvaluation(result);
       if (!evaluation) {
-        console.warn(`[postMessage] 채점 JSON 누락 — session=${session.id}`);
+        console.warn(`[postMessage] 채점 결과 누락 — session=${session.id}`);
       }
 
       const ts = Date.now();

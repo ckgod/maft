@@ -125,3 +125,17 @@ export function buildDetailContent(index: TopicIndex, topic: TopicNode): string 
     .map((d) => `### ${d.title}\n\n${readFileSync(d.filePath, 'utf8')}`)
     .join('\n\n---\n\n');
 }
+
+export type TopicBook = 'android' | 'kotlin';
+
+/**
+ * 토픽이 속한 책을 mi.tree 의 depth 1 조상(Android.md / Kotlin.md)으로 판별합니다.
+ * 코치 프롬프트의 청자·사전 지식 설정이 책마다 다르기 때문입니다.
+ */
+export function topicBook(index: TopicIndex, topic: TopicNode): TopicBook {
+  let cur: TopicNode | undefined = topic;
+  while (cur && cur.depth > 1) {
+    cur = cur.parentId ? index.byId.get(cur.parentId) : undefined;
+  }
+  return cur && /^kotlin/i.test(cur.id) ? 'kotlin' : 'android';
+}
