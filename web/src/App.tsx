@@ -32,14 +32,33 @@ function rowKindClass(t: Topic, starting: boolean): string {
   return '';
 }
 
-function categoryPrefix(id: string): string {
-  const m = id.match(/^(\d+-\d+)/);
-  return m ? m[1] : id.replace(/\.md$/, '').slice(0, 4);
+/** "1.2 Kotlin 표준 라이브러리" → "1.2". 번호가 없으면 빈 문자열. */
+function categoryNumber(title: string): string {
+  const m = title.match(/^([\d.]+)/);
+  return m ? m[1].replace(/\.$/, '') : '';
 }
 
 function categoryLabel(title: string): string {
   const cleaned = title.replace(/^[\d.\)\s-]+/, '').trim();
   return cleaned || title;
+}
+
+/** mi.tree 의 depth 1 = 책(Android Manifest Notes / Kotlin Deep Dive), depth 2 = 챕터. */
+const BOOK_DEPTH = 1;
+const SECTION_DEPTH = 2;
+
+/** 책마다 짧은 태그 — 사이드바 접두어와 행의 출처 표시에 씁니다. */
+function bookTag(bookId: string | null): string {
+  if (!bookId) return '';
+  if (/^android/i.test(bookId)) return 'AND';
+  if (/^kotlin/i.test(bookId)) return 'KT';
+  return bookId.replace(/\.md$/, '').slice(0, 3).toUpperCase();
+}
+
+interface TopicGroup {
+  bookId: string | null;
+  sectionId: string | null;
+  topics: Topic[];
 }
 
 type AppMode =
@@ -79,33 +98,69 @@ export default function App() {
     loadWeakPoints();
   }, []);
 
-  const sideCategories = useMemo(
-    () => categories.filter((c) => c.depth === 1),
+  const catById = useMemo(() => new Map(categories.map((c) => [c.id, c])), [categories]);
+
+  /** 토픽의 조상 카테고리 id 목록 (가까운 순). 토픽은 챕터 아래 몇 단계든 중첩될 수 있습니다. */
+  const ancestorsOf = useMemo(() => {
+    return (parentId: string | null): Category[] => {
+      const out: Category[] = [];
+      let cur = parentId ? catById.get(parentId) : undefined;
+      while (cur) {
+        out.push(cur);
+        cur = cur.parentId ? catById.get(cur.parentId) : undefined;
+      }
+      return out;
+    };
+  }, [catById]);
+
+  const placement = useMemo(() => {
+    const map = new Map<string, { bookId: string | null; sectionId: string | null; ancestors: string[] }>();
+    for (const t of topics ?? []) {
+      const anc = ancestorsOf(t.parentId);
+      map.set(t.id, {
+        bookId: anc.find((c) => c.depth === BOOK_DEPTH)?.id ?? null,
+        sectionId: anc.find((c) => c.depth === SECTION_DEPTH)?.id ?? null,
+        ancestors: anc.map((c) => c.id),
+      });
+    }
+    return map;
+  }, [topics, ancestorsOf]);
+
+  const books = useMemo(
+    () =>
+      categories
+        .filter((c) => c.depth === BOOK_DEPTH)
+        .map((b) => ({
+          book: b,
+          sections: categories.filter((c) => c.depth === SECTION_DEPTH && c.parentId === b.id),
+        })),
     [categories],
   );
 
+  /** 카테고리별 하위 토픽 수 (자손 전체). */
   const counts = useMemo(() => {
     const map = new Map<string, number>();
-    if (!topics) return map;
-    for (const t of topics) {
-      if (t.parentId) {
-        map.set(t.parentId, (map.get(t.parentId) ?? 0) + 1);
-      }
+    for (const p of placement.values()) {
+      for (const id of p.ancestors) map.set(id, (map.get(id) ?? 0) + 1);
     }
     return map;
-  }, [topics]);
+  }, [placement]);
 
-  const activeCategoryTitle = useMemo(() => {
-    if (!activeCat) return 'All topics';
-    const c = categories.find((x) => x.id === activeCat);
-    return c ? categoryLabel(c.title) : '';
-  }, [activeCat, categories]);
+  const activeCategory = activeCat ? catById.get(activeCat) : undefined;
+
+  const activeCategoryTitle = activeCategory ? categoryLabel(activeCategory.title) : 'All topics';
+
+  /** 챕터를 보고 있을 때 그 챕터가 속한 책 이름 — 제목 위 eyebrow 에 씁니다. */
+  const activeBookTitle =
+    activeCategory && activeCategory.depth === SECTION_DEPTH && activeCategory.parentId
+      ? catById.get(activeCategory.parentId)?.title ?? null
+      : null;
 
   const filtered = useMemo(() => {
     if (!topics) return [];
     let list = topics;
     if (activeCat) {
-      list = list.filter((t) => t.parentId === activeCat);
+      list = list.filter((t) => placement.get(t.id)?.ancestors.includes(activeCat));
     }
     const q = filter.trim().toLowerCase();
     if (q) {
@@ -114,7 +169,27 @@ export default function App() {
       );
     }
     return list;
-  }, [topics, activeCat, filter]);
+  }, [topics, activeCat, filter, placement]);
+
+  /** 책 → 챕터 순으로 연속된 토픽을 묶습니다. 서버가 mi.tree 순서를 보존하므로 인접 묶음이면 충분합니다. */
+  const groups = useMemo(() => {
+    const out: TopicGroup[] = [];
+    for (const t of filtered) {
+      const p = placement.get(t.id);
+      const bookId = p?.bookId ?? null;
+      const sectionId = p?.sectionId ?? null;
+      const last = out[out.length - 1];
+      if (last && last.bookId === bookId && last.sectionId === sectionId) {
+        last.topics.push(t);
+      } else {
+        out.push({ bookId, sectionId, topics: [t] });
+      }
+    }
+    return out;
+  }, [filtered, placement]);
+
+  const showBookHeaders = !activeCategory || activeCategory.depth < BOOK_DEPTH;
+  const showSectionHeaders = !activeCategory || activeCategory.depth < SECTION_DEPTH;
 
   async function handleSelectTopic(topicId: string) {
     if (mode.kind === 'starting') return;
@@ -177,18 +252,32 @@ export default function App() {
               <span className="nav-label">All topics</span>
               <span className="nav-count">{topics?.length ?? 0}</span>
             </li>
-            {sideCategories.map((c) => (
-              <li
-                key={c.id}
-                className={`nav-item${activeCat === c.id ? ' is-active' : ''}`}
-                onClick={() => setActiveCat(c.id)}
-              >
-                <span className="nav-prefix">{categoryPrefix(c.id)}</span>
-                <span className="nav-label">{categoryLabel(c.title)}</span>
-                <span className="nav-count">{counts.get(c.id) ?? 0}</span>
-              </li>
-            ))}
           </ul>
+          {books.map(({ book, sections }) => (
+            <div key={book.id} className="nav-book">
+              <div
+                className={`nav-item nav-book-head${activeCat === book.id ? ' is-active' : ''}`}
+                onClick={() => setActiveCat(book.id)}
+              >
+                <span className="nav-prefix nav-book-tag">{bookTag(book.id)}</span>
+                <span className="nav-label">{book.title}</span>
+                <span className="nav-count">{counts.get(book.id) ?? 0}</span>
+              </div>
+              <ul className="nav-list nav-sections">
+                {sections.map((c) => (
+                  <li
+                    key={c.id}
+                    className={`nav-item nav-section${activeCat === c.id ? ' is-active' : ''}`}
+                    onClick={() => setActiveCat(c.id)}
+                  >
+                    <span className="nav-prefix">{categoryNumber(c.title)}</span>
+                    <span className="nav-label">{categoryLabel(c.title)}</span>
+                    <span className="nav-count">{counts.get(c.id) ?? 0}</span>
+                  </li>
+                ))}
+              </ul>
+            </div>
+          ))}
         </nav>
 
         {weakPoints.length > 0 && (
@@ -225,7 +314,9 @@ export default function App() {
         ) : (
           <>
             <div className="main-head">
-              <span className="eyebrow">// table of contents</span>
+              <span className="eyebrow">
+                {activeBookTitle ? `// ${activeBookTitle}` : '// table of contents'}
+              </span>
               <h2 className="main-title">{activeCategoryTitle}</h2>
               <div className="main-meta">
                 <span className="main-count">
@@ -257,37 +348,62 @@ export default function App() {
                   : '이 섹션에 학습 가능한 토픽이 없습니다.'}
               </p>
             ) : (
-              <ol className="index-list">
-                {filtered.map((t, i) => {
-                  const starting = mode.kind === 'starting' && mode.topicId === t.id;
-                  const num = String(i + 1).padStart(2, '0');
+              <div className="index-groups">
+                {groups.map((g, gi) => {
+                  const prev = groups[gi - 1];
+                  const newBook = showBookHeaders && (!prev || prev.bookId !== g.bookId);
+                  const section = g.sectionId ? catById.get(g.sectionId) : undefined;
+                  const book = g.bookId ? catById.get(g.bookId) : undefined;
                   return (
-                    <li
-                      key={t.id}
-                      className={`index-row kind-${t.kind}${starting ? ' is-starting' : ''}${t.stats.mastered ? ' is-mastered' : ''}`}
-                      onClick={() => handleSelectTopic(t.id)}
-                    >
-                      <span className="row-num">{num}</span>
-                      <span className="row-id">{shortId(t.id)}</span>
-                      <span className="row-title">{t.title}</span>
-                      <span className={`row-kind${rowKindClass(t, starting)}`}>
-                        {rowKindLabel(t, starting)}
-                      </span>
-                      {starting ? (
-                        <span className="row-loading" aria-label="세션 시작 중">
-                          <span />
-                          <span />
-                          <span />
-                        </span>
-                      ) : (
-                        <span className="row-arrow" aria-hidden="true">
-                          →
-                        </span>
+                    <section key={`${g.bookId}::${g.sectionId}::${gi}`} className="index-group">
+                      {newBook && book && (
+                        <h3 className="group-book">
+                          <span className="group-book-tag">{bookTag(book.id)}</span>
+                          {book.title}
+                          <span className="group-count">{counts.get(book.id) ?? 0}</span>
+                        </h3>
                       )}
-                    </li>
+                      {showSectionHeaders && section && (
+                        <h4 className="group-section">
+                          <span className="group-section-num">{categoryNumber(section.title)}</span>
+                          {categoryLabel(section.title)}
+                        </h4>
+                      )}
+                      <ol className="index-list">
+                        {g.topics.map((t, i) => {
+                          const starting = mode.kind === 'starting' && mode.topicId === t.id;
+                          const num = String(i + 1).padStart(2, '0');
+                          return (
+                            <li
+                              key={t.id}
+                              className={`index-row kind-${t.kind}${starting ? ' is-starting' : ''}${t.stats.mastered ? ' is-mastered' : ''}`}
+                              onClick={() => handleSelectTopic(t.id)}
+                            >
+                              <span className="row-num">{num}</span>
+                              <span className="row-id">{shortId(t.id)}</span>
+                              <span className="row-title">{t.title}</span>
+                              <span className={`row-kind${rowKindClass(t, starting)}`}>
+                                {rowKindLabel(t, starting)}
+                              </span>
+                              {starting ? (
+                                <span className="row-loading" aria-label="세션 시작 중">
+                                  <span />
+                                  <span />
+                                  <span />
+                                </span>
+                              ) : (
+                                <span className="row-arrow" aria-hidden="true">
+                                  →
+                                </span>
+                              )}
+                            </li>
+                          );
+                        })}
+                      </ol>
+                    </section>
                   );
                 })}
-              </ol>
+              </div>
             )}
           </>
         )}

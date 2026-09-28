@@ -1339,9 +1339,110 @@
    Responsive
    ========================================================================== */
 
+
+/* ---- 책(Android / Kotlin) → 챕터 2단 내비게이션 ---- */
+
+.nav-book {
+  margin-top: 14px;
+}
+
+.nav-book-head {
+  border-top: 1px dashed var(--rule);
+  padding-top: 12px;
+}
+
+.nav-book-head .nav-label {
+  font-weight: 700;
+  color: var(--ink);
+}
+
+.nav-book-tag {
+  color: var(--blueprint);
+  font-weight: 600;
+  text-transform: uppercase;
+}
+
+.nav-sections {
+  margin-top: 2px;
+  padding-left: 12px;
+  border-left: 1px solid var(--rule);
+  margin-left: 18px;
+}
+
+.nav-section {
+  padding-top: 6px;
+  padding-bottom: 6px;
+}
+
+.nav-section .nav-label {
+  font-size: var(--tt-s);
+}
+
+/* ---- 목록의 책·챕터 헤더 ---- */
+
+.index-groups {
+  display: flex;
+  flex-direction: column;
+}
+
+.index-group + .index-group {
+  margin-top: 8px;
+}
+
+.group-book {
+  display: flex;
+  align-items: baseline;
+  gap: 12px;
+  margin: 36px 0 4px;
+  font-family: var(--font-display);
+  font-size: var(--tt-l);
+  font-weight: 700;
+  color: var(--ink);
+  letter-spacing: -0.01em;
+}
+
+.index-group:first-child .group-book {
+  margin-top: 8px;
+}
+
+.group-book-tag {
+  font-family: var(--font-mono);
+  font-size: var(--tt-xs);
+  color: var(--blueprint);
+  border: 1px solid var(--blueprint-line);
+  padding: 2px 6px;
+  letter-spacing: 0.08em;
+}
+
+.group-count {
+  margin-left: auto;
+  font-family: var(--font-mono);
+  font-size: var(--tt-xs);
+  color: var(--ink-4);
+  font-weight: 400;
+}
+
+.group-section {
+  display: flex;
+  align-items: baseline;
+  gap: 10px;
+  margin: 18px 0 8px;
+  font-family: var(--font-display);
+  font-size: var(--tt-body);
+  font-weight: 600;
+  color: var(--ink-2);
+}
+
+.group-section-num {
+  font-family: var(--font-mono);
+  font-size: var(--tt-xs);
+  color: var(--ink-4);
+  min-width: 28px;
+}
+
 @media (max-width: 920px) {
   .app-list {
-    grid-template-columns: 1fr;
+    grid-template-columns: minmax(0, 1fr);
     gap: 24px;
     padding: 24px 24px 56px;
   }
@@ -1379,6 +1480,30 @@
   }
   .nav-count {
     display: none;
+  }
+  /* 가로 스크롤 칩이 grid 열을 밀어내 페이지 전체가 넓어지지 않도록 */
+  .sidebar,
+  .main-area {
+    min-width: 0;
+  }
+  .weak-concept {
+    overflow-wrap: anywhere;
+  }
+  .nav-book {
+    margin-top: 10px;
+  }
+  .nav-book-head {
+    grid-template-columns: auto 1fr;
+    justify-items: start;
+    padding: 10px 4px 6px;
+  }
+  .nav-sections {
+    margin-left: 0;
+    padding-left: 0;
+    border-left: none;
+  }
+  .group-book {
+    margin-top: 28px;
   }
   .index-row {
     grid-template-columns: 28px 1fr auto 14px;
