@@ -72,6 +72,7 @@ interface Chain {
   book: string;
   arm: Arm;
   concepts: string[];
+  criteria: string[];
   turns: TurnRecord[];
 }
 
@@ -99,7 +100,7 @@ function record(turn: number, learner: string, r: ClaudeResult, message: string,
 
 async function runChain(arm: Arm, topic: TopicNode, book: 'android' | 'kotlin', detail: string,
   learnerTurns: string[], sessionId: string): Promise<Chain> {
-  const chain: Chain = { sessionId, topicId: topic.id, book, arm, concepts: [], turns: [] };
+  const chain: Chain = { sessionId, topicId: topic.id, book, arm, concepts: [], criteria: [], turns: [] };
   let claudeSession: string | undefined;
 
   // 학습 시작
@@ -111,6 +112,7 @@ async function runChain(arm: Arm, topic: TopicNode, book: 'android' | 'kotlin', 
       const clean = legacy.truncateRunaway(r.text);
       const concepts = legacy.extractConceptList(clean.text);
       chain.concepts = (concepts ?? []).map((c) => c.name);
+      chain.criteria = (concepts ?? []).map((c) => c.criterion);
       chain.turns.push(record(0, '학습 시작', r, legacy.stripCoachJson(clean.text), !!concepts, clean.truncated,
         { scores: [], integration: null, mastered: false }));
     } else {
@@ -119,6 +121,7 @@ async function runChain(arm: Arm, topic: TopicNode, book: 'android' | 'kotlin', 
       claudeSession = r.sessionId;
       const parsed = conceptsFromStructured(r.structuredOutput);
       chain.concepts = (parsed?.concepts ?? []).map((c) => c.name);
+      chain.criteria = (parsed?.concepts ?? []).map((c) => c.criterion);
       const msg = parsed ? parsed.message : r.text;
       chain.turns.push(record(0, '학습 시작', r, msg, !!parsed, truncateRunaway(msg).truncated,
         { scores: [], integration: null, mastered: false }));
@@ -188,6 +191,9 @@ function summarize(chains: Chain[], recorded: Map<string, number[]>): string {
     const scored = evalTurns.flatMap((t) => t.scores.map((s) => s.score));
     const lowTurns = evalTurns.filter((t) => t.scores.some((s) => s.score < 3));
     const sum = (f: (t: TurnRecord) => number) => turns.reduce((a, t) => a + f(t), 0);
+    const criteria = chains.filter((c) => c.arm === arm).flatMap((c) => c.criteria);
+    // 평가 턴 본문에서 학습자에게 던진 질문 수 (물음표 기준 대리 지표)
+    const questions = evalTurns.map((t) => (t.message.match(/\?/g) ?? []).length);
     return {
       calls: turns.length,
       errors: turns.filter((t) => t.error).length,
@@ -203,6 +209,9 @@ function summarize(chains: Chain[], recorded: Map<string, number[]>): string {
       avgOutput: Math.round(sum((t) => t.outputTokens) / Math.max(1, turns.length)),
       avgSec: (sum((t) => t.durationMs) / Math.max(1, turns.length) / 1000).toFixed(1),
       cost: sum((t) => t.costUsd).toFixed(2),
+      avgCriterion: Math.round(criteria.reduce((a, c) => a + c.length, 0) / Math.max(1, criteria.length)),
+      avgQuestions: (questions.reduce((a, b) => a + b, 0) / Math.max(1, questions.length)).toFixed(2),
+      avgEvalChars: Math.round(evalTurns.reduce((a, t) => a + t.message.length, 0) / Math.max(1, evalTurns.length)),
     };
   };
   const a = agg('legacy');
@@ -214,6 +223,7 @@ function summarize(chains: Chain[], recorded: Map<string, number[]>): string {
     ['3점 미만 턴 중 합격선 안내', 'belowBar'], ['평균 본문 길이(자)', 'avgMsgChars'],
     ['평균 총 토큰/호출', 'avgTokens'], ['평균 캐시 생성 토큰/호출', 'avgCacheCreation'],
     ['평균 출력 토큰/호출', 'avgOutput'], ['평균 응답 시간(초)', 'avgSec'], ['API 환산 비용($)', 'cost'],
+    ['평균 개념 기준 길이(자)', 'avgCriterion'], ['평가 턴당 물음표 수', 'avgQuestions'], ['평가 턴 본문 길이(자)', 'avgEvalChars'],
   ];
   for (const [label, key] of rows) lines.push(`| ${label} | ${a[key]} | ${b[key]} |`);
 
