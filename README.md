@@ -41,17 +41,17 @@ sequenceDiagram
 
   U->>W: 토픽 선택
   W->>S: POST /api/sessions { topicId }
-  S->>C: claude -p "학습 시작" --system-prompt 〈파인만 코치 + 토픽 원문〉
-  C-->>S: 청자/범위 안내 + 핵심 개념 목록 JSON
-  S->>S: extractConceptList · createSession (개념 영속화)
+  S->>C: claude -p "학습 시작" --system-prompt 〈파인만 코치 + 토픽 원문〉 --json-schema 〈START_SCHEMA〉
+  C-->>S: structured_output { message, concepts }
+  S->>S: conceptsFromStructured · createSession (개념 영속화)
   S-->>W: { sessionId, message, concepts }
 
   loop 코칭 사이클 (모든 개념 + 통합 마스터까지)
     U->>W: 자기 설명 입력
     W->>S: POST /api/sessions/:id/messages
-    S->>C: claude -p --resume sessionId 〈+ 시스템 프롬프트 + 형식 reminder〉
-    C-->>S: 평가문 + 다음 질문 + 개념별 채점 JSON
-    S->>S: extractEvaluation · appendTurn · applyEvaluation (best_score 갱신)
+    S->>C: claude -p --resume sessionId 〈+ 시스템 프롬프트〉 --json-schema 〈EVAL_SCHEMA〉
+    C-->>S: structured_output { message, scores, integration_score, next_focus, mastered }
+    S->>S: evaluationFromStructured · appendTurn · applyEvaluation (best_score 갱신)
     S-->>W: { message, concepts, integrationScore, mastered }
     W-->>U: 코치 메시지 · 개념 체크리스트
   end
@@ -162,12 +162,16 @@ open http://localhost:5173
 | `MAFT_DB_PATH` | `server/data/progress.db` | SQLite 진행 상황 DB |
 | `PORT` | `3001` | 서버 포트 |
 | `MAFT_MODEL` | `claude-opus-5-5` | 코치(개념 추출·채점) 모델. 코드 수정 없이 모델을 바꿔 비교할 때 사용합니다 |
+| `MAFT_EFFORT` | `medium` | 코치의 추론 강도(`low`~`max`). Opus 5.5 는 생각하는 양을 이 값으로만 조절합니다 |
 | `ANTHROPIC_API_KEY` | (미설정 권장) | 설정 시 OAuth 대신 API 키로 동작해 사용량 과금이 발생합니다. **MAFT 의 의도와 어긋나므로 unset 을 권장합니다** |
 
 ## 핵심 설계 결정
 
 - **Claude Code headless 로 LLM 호출** — `claude -p` 서브프로세스를 spawn 하고 `--output-format json` 을 파싱합니다. `--bare` 옵션을 사용하지 않으면 OAuth(claude.ai 구독) 자격증명이 자동으로 적용되므로 별도 API 키 없이 구독 한도 내에서 동작합니다.
-- **개념 단위 채점** — 토픽을 핵심 개념 3~5개로 분해하고, 학습 시작 시 코치가 개념 체크리스트를 JSON 으로 산출해 `concepts` 테이블에 영속화합니다. 이후 평가 턴마다 코치는 답변이 다룬 개념별 점수(`{scores, integration_score, next_focus, mastered}`)를 첨부하며, 한 답변이 여러 개념을 동시에 끌어올릴 수 있습니다. 키 변형 금지·형식 reminder 자동 첨부로 LLM 변동성을 흡수하고, 시작 시 개념 JSON 이 누락되면 1회 재시도합니다.
+- **코치 격리** — 코치는 도구가 필요 없는 대화 역할이므로 `--tools ""` `--strict-mcp-config` `--disable-slash-commands` `--setting-sources ""` 로 도구·MCP·스킬·CLAUDE.md 로딩을 막습니다. 이 플래그가 없으면 사용자 환경의 CLAUDE.md 와 MCP 도구 설명이 코치 컨텍스트에 섞이고 호출당 수만 토큰을 더 씁니다.
+- **개념 단위 채점** — 토픽을 핵심 개념 3~5개로 분해하고, 학습 시작 시 코치가 개념 체크리스트를 JSON 으로 산출해 `concepts` 테이블에 영속화합니다. 이후 평가 턴마다 코치는 답변이 다룬 개념별 점수(`{scores, integration_score, next_focus, mastered}`)를 돌려주며, 한 답변이 여러 개념을 동시에 끌어올릴 수 있습니다. 응답 형식은 CLI 구조화 출력(`--json-schema`)으로 보장하고, 구조화 출력이 없을 때만 본문의 JSON 블록을 파싱합니다. 시작 시 개념 목록이 누락되면 1회 재시도합니다.
+- **책별 청자** — Android Manifest Notes 와 Kotlin Deep Dive 는 청자와 전제 지식이 다르므로, 토픽이 속한 책(mi.tree depth 1)에 따라 코치 프롬프트의 청자 설정을 바꿉니다.
+- **프롬프트 비교 실험** — `server/scripts/eval/compare.ts` 가 기록된 학습 세션의 학습자 답변을 옛 방식과 현재 방식에 똑같이 넣고 형식·점수·어조·비용을 표로 비교합니다 (`npx tsx scripts/eval/compare.ts [턴 수] [동시 실행]`, 구독 사용량 소모).
 - **점수 인플레이션 방지** — 같은 답변을 살짝 바꿔 재제출해도 새 정보가 없으면 점수가 오르지 않도록 시스템 프롬프트에 일관성 규칙을 두었습니다 (`score 2 → 2` 동결을 PoC 에서 확인했습니다).
 - **청자 재정의** — 일반적 파인만의 "12살 청자" 가정은 안드로이드 학습엔 부적합해 (Compose 가 무엇인지부터 풀어 설명할지 학습자가 혼란을 겪습니다), **"이 토픽은 처음 듣지만 4대 컴포넌트 · Compose Composable/State · Kotlin 기초는 아는 동료 개발자"** 로 재정의했습니다.
 - **SQLite 영속화 + 개념별 진척 추적** — 세션·개념·turns 를 SQLite 에 영속화하고, 개념별 `best_score` 로 진척을 추적해 사이드바 Weak Points(3점 미만 개념)와 인덱스 진척률(`n/N 개념`)로 노출합니다.

@@ -26,3 +26,6 @@ typescript
 # Claude Code 워크플로 작업공간 (todo·lessons·prompt-review 등 — 레포 산출물 아님)
 tasks/
 
+
+# 프롬프트 비교 실험 산출물
+server/scripts/eval/out/
